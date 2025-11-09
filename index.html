@@ -510,90 +510,109 @@
        
         this.gloveTextures.set(name, new THREE.CanvasTexture(canvas));
       }
- updateGlove(handIndex, handData, designName, fadeState, debugManager) {
-  const glove = this.palmGloves[handIndex];
-  if (!glove || !handData) {
-    if (glove) glove.visible = false;
-    return null;
-  }
+      updateGlove(handIndex, handData, designName) {
+        const glove = this.palmGloves[handIndex];
+        if (!glove || !handData) {
+          if (glove) glove.visible = false;
+          return null;
+        }
+        const { landmarks, wrist } = handData;
+ 
+        // ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
+        const middleFingerTip = landmarks[12];
+        const centerX = middleFingerTip.x * window.innerWidth;
+        const centerY = (1 - middleFingerTip.y) * window.innerHeight;
+        
+        // Масштаб
+        let scale = 500;
+        
+        // Rotation - від зап'ястя до кінчика середнього пальця
+        const angle = Math.atan2(
+          middleFingerTip.y - wrist.y,
+          middleFingerTip.x - wrist.x
+        );
+        const glovePosition = {
+          x: centerX - window.innerWidth / 2,
+          y: centerY - window.innerHeight / 2
+        };
+        glove.position.set(glovePosition.x, glovePosition.y, 0);
+        
+        // КОРЕКЦІЯ ПОЗИЦІЇ - рукавиця на кінчику пальця
+        const offsetDistance = scale * 0.4;
+        glove.position.x -= Math.cos(angle) * offsetDistance;
+        glove.position.y += Math.sin(angle) * offsetDistance;
+ 
+        // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
+        const thumbBase = landmarks[1];
+        const pinkyBase = landmarks[17];
+        const palmDirection = thumbBase.x - pinkyBase.x;
 
-  const { landmarks, wrist } = handData;
-  
-  // ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
-  const middleFingerTip = landmarks[12];
-  const centerX = middleFingerTip.x * window.innerWidth;
-  const centerY = (1 - middleFingerTip.y) * window.innerHeight;
-
-  // Масштаб
-  let scale = 500;
-
-  // Rotation - від зап'ястя до кінчика середнього пальця
-  const angle = Math.atan2(
-    middleFingerTip.y - wrist.y,
-    middleFingerTip.x - wrist.x
-  );
-
-  const glovePosition = {
-    x: centerX - window.innerWidth / 2,
-    y: centerY - window.innerHeight / 2
-  };
-
-  glove.position.set(glovePosition.x, glovePosition.y, 0);
-
-  // КОРЕКЦІЯ ПОЗИЦІЇ - рукавиця на кінчику пальця
-  const offsetDistance = scale * 0.4;
-  glove.position.x -= Math.cos(angle) * offsetDistance;
-  glove.position.y += Math.sin(angle) * offsetDistance;
-  
-  // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
-  const thumbBase = landmarks[1];
-  const pinkyBase = landmarks[17];
-  const palmDirection = thumbBase.x - pinkyBase.x;
-
-  // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ
-  if (handIndex === 1) {
-    // Права рука
-    if (palmDirection > 0) {
-      // Долоня до камери - не дзеркалимо
-      glove.scale.set(scale, -scale, 1);
-    } else {
-      // Зовнішня сторона до камери - дзеркалимо
-      glove.scale.set(-scale, -scale, 1);
+        // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ
+        if (handIndex === 1) {
+          // Права рука
+          if (palmDirection > 0) {
+            // Долоня до камери - не дзеркалимо
+            glove.scale.set(scale, -scale, 1);
+          } else {
+            // Зовнішня сторона до камери - дзеркалимо
+            glove.scale.set(-scale, -scale, 1);
+          }
+        } else {
+          // Ліва рука
+          if (palmDirection < 0) {
+            // Долоня до камери - не дзеркалимо
+            glove.scale.set(scale, -scale, 1);
+          } else {
+            // Зовнішня сторона до камери - дзеркалимо
+            glove.scale.set(-scale, -scale, 1);
+          }
+        }
+ 
+        // Vertical rotation
+        glove.rotation.z = angle - Math.PI / 2;
+        
+        // Texture
+        const texture = this.gloveTextures.get(designName);
+        if (texture) {
+          glove.material.map = texture;
+          glove.material.needsUpdate = true;
+        }
+        
+        glove.visible = true;
+        return {
+          position: { x: glove.position.x, y: glove.position.y },
+          scale: scale,
+          angle: angle,
+          screenPosition: { x: centerX, y: centerY }
+        };
+      }
+      resize() {
+        if (!this.camera || !this.renderer) return;
+       
+        this.camera.left = -window.innerWidth / 2;
+        this.camera.right = window.innerWidth / 2;
+        this.camera.top = window.innerHeight / 2;
+        this.camera.bottom = -window.innerHeight / 2;
+        this.camera.updateProjectionMatrix();
+       
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      render() {
+        if (this.scene && this.camera) {
+          this.renderer.render(this.scene, this.camera);
+        }
+      }
+      cleanup() {
+        this.palmGloves.forEach(glove => {
+          glove.geometry.dispose();
+          glove.material.dispose();
+        });
+        this.gloveTextures.forEach(texture => texture.dispose());
+        if (this.renderer) {
+          this.renderer.dispose();
+        }
+      }
     }
-  } else {
-    // Ліва рука
-    if (palmDirection < 0) {
-      // Долоня до камери - не дзеркалимо
-      glove.scale.set(scale, -scale, 1);
-    } else {
-      // Зовнішня сторона до камери - дзеркалимо
-      glove.scale.set(-scale, -scale, 1);
-    }
-  }
-  
-  // Vertical rotation
-  glove.rotation.z = angle - Math.PI / 2;
-
-  // Texture
-  const texture = this.gloveTextures.get(designName);
-  if (texture) {
-    glove.material.uniforms.map.value = texture;
-    glove.material.needsUpdate = true;
-  }
-
-  // Fade animation
-  this.handleFadeAnimation(glove, fadeState);
-
-  return {
-    position: { x: glove.position.x, y: glove.position.y },
-    scale: scale,
-    angle: angle,
-    screenPosition: {
-      x: centerX,
-      y: centerY
-    }
-  };
-}
 
     // ========== MAIN APPLICATION ==========
     class GloveARApplication {
@@ -745,8 +764,7 @@
           this.elements.handIndicator.classList.remove('show');
           this.state.hands = predictions.landmarks.map((landmarks, i) => ({
             landmarks,
-            wrist: landmarks[0],
-            handedness: predictions.handedness?.[i]
+            wrist: landmarks[0]
           }));
         } else {
           this.state.handNotDetectedCount++;
@@ -790,11 +808,10 @@
           const gloveData = this.gloveRenderer.updateGlove(
             i,
             hand,
-            this.state.currentDesign,
-            hand.handedness
+            this.state.currentDesign
           );
           if (gloveData && this.debugManager.enabled) {
-            debugInfo += `Hand ${i} (${hand.handedness?.categoryName || 'Unknown'}):<br>`;
+            debugInfo += `Hand ${i}:<br>`;
             debugInfo += `- Pos: (${gloveData.screenPosition.x.toFixed(1)}, ${gloveData.screenPosition.y.toFixed(1)})<br>`;
             debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
             debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br><br>`;
@@ -864,4 +881,3 @@
   </script>
 </body>
 </html>
-
