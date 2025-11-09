@@ -786,12 +786,15 @@ class AudioService {
         const centerX = wrist.x * window.innerWidth;
         const centerY = (1 - wrist.y) * window.innerHeight;
         
-   // Універсальний масштаб для будь-якої руки
-const actualHandLength = 17; // в см - можна змінювати для дитини/дорослого
-const baseScale = actualHandLength * 0.14; // універсальна формула
+// Динамічний масштаб за розміром руки
+const getHandScale = (handLength) => {
+  return handLength * 0.14 * CONFIG.SCALE.MULTIPLIER;
+};
 
-let scale = baseScale * CONFIG.SCALE.MULTIPLIER;
-scale = Math.max(CONFIG.SCALE.MIN, Math.min(CONFIG.SCALE.MAX, scale));       // Rotation
+// Використання:
+const childHandScale = getHandScale(9);   // для дитини 9 см
+const adultHandScale = getHandScale(17);  // для дорослого 17 см
+        // Rotation
         const middleFinger = landmarks[12];
         const angle = Math.atan2(
           middleFinger.y - wrist.y,
@@ -1298,5 +1301,6 @@ scale = Math.max(CONFIG.SCALE.MIN, Math.min(CONFIG.SCALE.MAX, scale));       // 
   </script>
 </body>
 </html>
+
 
 
