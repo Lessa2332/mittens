@@ -265,9 +265,9 @@
     // ========== CONFIGURATION ==========
     const CONFIG = {
       SCALE: {
-        MULTIPLIER: 2.5,
-        MIN: 120,
-        MAX: 500
+        MULTIPLIER: 2.8,
+        MIN: 150,
+        MAX: 600
       },
       HANDS: {
         MAX_HANDS: 2,
@@ -307,23 +307,60 @@
       }
     };
 
-    // ========== TYPES ==========
-    class AppState {
-      currentLang = 'en';
-      currentDesign = "1";
-      isMuted = false;
-      lastLandmarks = null;
-      handNotDetectedCount = 0;
-      animationFrameId = null;
-      wristVelocity = { x: 0, y: 0 };
-      lastWristPos = null;
-      snowTime = 0;
-      isAudioUnlocked = false;
-      fadeOut = false;
-      fadeIn = false;
-      hands = [];
-      isInitialized = false;
-      lastDetectionTime = 0;
+    // ========== SPARKLE PARTICLE ==========
+    class SparkleParticle {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = Math.random() * 0.5 + 0.2;
+        this.size = Math.random() * 2 + 1;
+        this.life = 1.0;
+        this.stuck = false;
+        this.brightness = Math.random() * 0.5 + 0.5;
+        this.pulse = Math.random() * 2 * Math.PI;
+      }
+
+      update(wristPos = null, wristVel = null) {
+        if (this.stuck) return;
+        
+        if (wristPos && wristVel && !this.stuck) {
+          const dx = this.x - wristPos.x;
+          const dy = this.y - wristPos.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 150 && Math.hypot(wristVel.x, wristVel.y) > 50) {
+            const force = 3;
+            this.vx += (dx / dist) * force;
+            this.vy += (dy / dist) * force;
+          }
+        }
+        
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.02;
+        this.vx *= 0.98;
+        
+        if (this.y > window.innerHeight - 20) {
+          this.y = window.innerHeight - 20;
+          this.vy = 0;
+          this.vx = 0;
+          this.stuck = true;
+        }
+        
+        if (this.x < -50 || this.x > window.innerWidth + 50) this.life = 0;
+      }
+
+      draw(ctx) {
+        if (this.life <= 0) return;
+        
+        ctx.save();
+        ctx.globalAlpha = this.life * 0.8 * this.brightness;
+        ctx.fillStyle = `hsl(${Math.sin(this.pulse + performance.now() * 0.001) * 30 + 60}, 100%, ${Math.sin(this.pulse + performance.now() * 0.001) * 20 + 80}%)`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
 
     // ========== SERVICES ==========
@@ -355,6 +392,8 @@
       constructor() {
         this.handLandmarker = null;
         this.isInitialized = false;
+        this.lastDetectionTime = 0;
+        this.lastResult = null;
       }
 
       async initialize() {
@@ -549,7 +588,7 @@
       updateGlove(handIndex, handData, designName, fadeState) {
         const glove = this.palmGloves[handIndex];
         if (!glove || !handData) {
-          glove.visible = false;
+          if (glove) glove.visible = false;
           return;
         }
 
@@ -559,7 +598,7 @@
         const centerX = wrist.x * window.innerWidth;
         const centerY = (1 - wrist.y) * window.innerHeight;
         
-        // Scale
+        // Scale - збільшений розмір
         const handWidth = Math.hypot(
           (landmarks[5].x - landmarks[17].x) * window.innerWidth,
           (landmarks[5].y - landmarks[17].y) * window.innerHeight
@@ -585,14 +624,14 @@
         glove.position.x += Math.cos(angle) * scale * 0.1;
         glove.position.y -= Math.sin(angle) * scale * 0.1;
         
-        // Mirror for right hand
+        // Mirror for right hand - ВІДЗЕРКАЛЕННЯ для правої руки
         if (handIndex === 1) {
           glove.scale.set(-scale, scale, 1);
         } else {
           glove.scale.set(scale, scale, 1);
         }
         
-        // Vertical rotation
+        // Vertical rotation - ПОВОРОТ у вертикальну позицію
         glove.rotation.z = angle - Math.PI / 2;
 
         // Texture
@@ -604,8 +643,6 @@
 
         // Fade animation
         this.handleFadeAnimation(glove, fadeState);
-        
-        glove.visible = true;
       }
 
       handleFadeAnimation(glove, fadeState) {
@@ -630,9 +667,11 @@
 
       updateUniforms(time, snowTime) {
         this.palmGloves.forEach(glove => {
-          glove.material.uniforms.time.value = time;
-          glove.material.uniforms.shineIntensity.value = 
-            0.8 + 0.2 * Math.sin(snowTime);
+          if (glove.visible) {
+            glove.material.uniforms.time.value = time;
+            glove.material.uniforms.shineIntensity.value = 
+              0.8 + 0.2 * Math.sin(snowTime);
+          }
         });
       }
 
@@ -671,7 +710,23 @@
     // ========== MAIN APPLICATION ==========
     class GloveARApplication {
       constructor() {
-        this.state = new AppState();
+        this.state = {
+          currentLang: 'en',
+          currentDesign: "1",
+          isMuted: false,
+          lastLandmarks: null,
+          handNotDetectedCount: 0,
+          animationFrameId: null,
+          wristVelocity: { x: 0, y: 0 },
+          lastWristPos: null,
+          snowTime: 0,
+          isAudioUnlocked: false,
+          fadeOut: false,
+          fadeIn: false,
+          hands: [],
+          isInitialized: false
+        };
+        
         this.audioService = new AudioService();
         this.handDetection = new HandDetectionService();
         this.gloveRenderer = new GloveRenderer();
@@ -691,6 +746,7 @@
 
         this.confettiCtx = this.elements.confettiCanvas.getContext("2d");
         this.bindEvents();
+        this.resizeCanvases();
       }
 
       async initialize() {
@@ -762,8 +818,6 @@
           if (!this.state.isMuted) {
             this.audioService.playBackgroundMusic();
           }
-          document.removeEventListener('click', unlock);
-          document.removeEventListener('touchstart', unlock);
         };
         
         document.addEventListener('click', unlock, { once: true });
@@ -928,7 +982,7 @@
         if (!this.state.lastLandmarks) return;
 
         // Update gloves for each hand
-        for (let i = 0; i < this.state.hands.length; i++) {
+        for (let i = 0; i < Math.max(this.state.hands.length, CONFIG.HANDS.MAX_HANDS); i++) {
           this.gloveRenderer.updateGlove(
             i, 
             this.state.hands[i], 
@@ -1010,4 +1064,11 @@
       }
     }
 
-    // Sparkle
+    // ========== INITIALIZATION ==========
+    window.addEventListener('DOMContentLoaded', () => {
+      new GloveARApplication().initialize();
+    });
+
+  </script>
+</body>
+</html>
