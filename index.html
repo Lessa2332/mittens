@@ -244,7 +244,7 @@
       fadeOut: false,
       fadeIn: false,
       hands: [],
-      isInitialized: false // Додаємо прапорець ініціалізації
+      isInitialized: false
     };
 
     const elements = {
@@ -263,10 +263,6 @@
     const confettiCtx = elements.confettiCanvas.getContext("2d");
     let sparkles = [];
 
-    let scene, camera, renderer;
-    let palmGloves = [];
-    let handLandmarker;
-
     function resizeCanvases() {
       elements.confettiCanvas.width = window.innerWidth;
       elements.confettiCanvas.height = window.innerHeight;
@@ -282,6 +278,10 @@
 
     const DESIGNS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
     const gloveTextures = {};
+
+    let scene, camera, renderer;
+    let palmGloves = [];
+    let handLandmarker;
 
     const GLOVE_SHADER = {
       vertexShader: `
@@ -383,7 +383,7 @@
           this.hideLoading();
           this.startRenderLoop();
           this.unlockAudio();
-          state.isInitialized = true; // Позначаємо, що ініціалізація завершена
+          state.isInitialized = true;
         } catch (error) {
           this.handleError(error);
         }
@@ -442,15 +442,26 @@
               frameRate: { ideal: 30 } 
             }
           });
+          
           elements.video.srcObject = stream;
-          await new Promise((resolve) => {
+          
+          // ✅ ВИПРАВЛЕННЯ: Чекаємо поки відео буде готове
+          await new Promise((resolve, reject) => {
             elements.video.onloadedmetadata = () => {
-              elements.video.play();
-              resolve();
+              elements.video.play().then(resolve).catch(reject);
             };
+            elements.video.onerror = reject;
+            
+            // Fallback на випадок якщо onloadedmetadata не спрацює
+            setTimeout(() => {
+              if (elements.video.readyState >= 1) {
+                elements.video.play().then(resolve).catch(reject);
+              }
+            }, 1000);
           });
+          
         } catch (error) {
-          console.error('Camera error:', error);
+          console.error('Camera setup failed:', error);
           throw new Error('CAMERA_ERROR');
         }
       }
@@ -512,6 +523,7 @@
       async loadResources() {
         const loadImage = (name) => new Promise((resolve) => {
           const img = new Image();
+          img.crossOrigin = "anonymous";
           img.src = `gloves/winter/${name}.png`;
           img.onload = () => {
             const texture = new THREE.TextureLoader().load(`gloves/winter/${name}.png`);
@@ -770,7 +782,6 @@
       }
     }
 
-    // Ініціалізація після завантаження DOM
     window.addEventListener('DOMContentLoaded', () => {
       resizeCanvases();
       new GloveARApp();
