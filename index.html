@@ -781,7 +781,7 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   const centerY = (1 - wrist.y) * window.innerHeight;
   
   // ВИПРАВЛЕНИЙ МАСШТАБ - ще більший розмір
-  let scale = 600; // ЗБІЛЬШЕНО з 400 на 500
+  let scale = 500; // ЗБІЛЬШЕНО з 400 на 500
   
   // Rotation
   const middleFinger = landmarks[12];
@@ -801,15 +801,12 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   glove.position.x += Math.cos(angle) * scale * 0.2;
   glove.position.y -= Math.sin(angle) * scale * 0.2;
   
-// ВИПРАВЛЕНЕ МАСШТАБУВАННЯ - ПРАВИЛЬНА ОРІЄНТАЦІЯ
+// ВАРІАНТ 4 - ПРОСТЕ ВИПРАВЛЕННЯ
 if (handIndex === 1) {
-  // Права рука - дзеркалимо по X
-  glove.scale.set(-scale, scale, 1);
+  glove.scale.set(-scale, -scale, 1); // Обидві осі дзеркалимо для правої руки
 } else {
-  // Ліва рука - не дзеркалимо
-  glove.scale.set(scale, scale, 1);
+  glove.scale.set(scale, -scale, 1); // Тільки по Y дзеркалимо для лівої руки
 }
-  
   // Vertical rotation
   glove.rotation.z = angle - Math.PI / 2;
 
@@ -1282,6 +1279,7 @@ if (handIndex === 1) {
   </script>
 </body>
 </html>
+
 
 
 
