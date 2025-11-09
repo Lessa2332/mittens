@@ -767,80 +767,78 @@
         this.gloveTextures.set(name, new THREE.CanvasTexture(canvas));
       }
 
-      updateGlove(handIndex, handData, designName, fadeState, debugManager) {
-        const glove = this.palmGloves[handIndex];
-        if (!glove || !handData) {
-          if (glove) glove.visible = false;
-          return null;
-        }
+updateGlove(handIndex, handData, designName, fadeState, debugManager) {
+  const glove = this.palmGloves[handIndex];
+  if (!glove || !handData) {
+    if (glove) glove.visible = false;
+    return null;
+  }
 
-        const { landmarks, wrist } = handData;
-        
-        // Position
-        const centerX = wrist.x * window.innerWidth;
-        const centerY = (1 - wrist.y) * window.innerHeight;
-        
-// ВИПРАВЛЕНИЙ МАСШТАБ - збільшений розмір
-const actualHandLength = 17; // в см - для дорослого
-const baseScale = actualHandLength * 2.0; // ЗБІЛЬШЕНО з 0.14 на 2.0
+  const { landmarks, wrist } = handData;
+  
+  // Position
+  const centerX = wrist.x * window.innerWidth;
+  const centerY = (1 - wrist.y) * window.innerHeight;
+  
+  // ВИПРАВЛЕНИЙ МАСШТАБ - ще більший розмір
+  let scale = 500; // ЗБІЛЬШЕНО з 400 на 500
+  
+  // Rotation
+  const middleFinger = landmarks[12];
+  const angle = Math.atan2(
+    middleFinger.y - wrist.y,
+    middleFinger.x - wrist.x
+  );
 
-let scale = 400; // Фіксований великий розмір
-scale = Math.max(300, Math.min(800, scale)); // ЗБІЛЬШЕНО мінімальний розмір
-        
-        // Rotation
-        const middleFinger = landmarks[12];
-        const angle = Math.atan2(
-          middleFinger.y - wrist.y,
-          middleFinger.x - wrist.x
-        );
+  const glovePosition = {
+    x: centerX - window.innerWidth / 2,
+    y: centerY - window.innerHeight / 2
+  };
 
-        const glovePosition = {
-          x: centerX - window.innerWidth / 2,
-          y: centerY - window.innerHeight / 2
-        };
+  glove.position.set(glovePosition.x, glovePosition.y, 0);
 
-glove.position.set(glovePosition.x, glovePosition.y, 0);
+  // ВИПРАВЛЕНЕ ПОЗИЦІОНУВАННЯ - краще центрування
+  glove.position.x += Math.cos(angle) * scale * 0.2;
+  glove.position.y -= Math.sin(angle) * scale * 0.2;
+  
+  // ВИПРАВЛЕНЕ МАСШТАБУВАННЯ ТА ДЗЕРКАЛЕННЯ
+  if (handIndex === 1) {
+    // Права рука - тільки по X дзеркалимо
+    glove.scale.set(-scale, scale, 1);
+  } else {
+    // Ліва рука - не дзеркалимо
+    glove.scale.set(scale, scale, 1);
+  }
+  
+  // Vertical rotation
+  glove.rotation.z = angle - Math.PI / 2;
 
-// ВИПРАВЛЕНЕ ПОЗИЦІОНУВАННЯ - рукавиця на долоні
-glove.position.x += Math.cos(angle) * scale * 0.5;  // ЗБІЛЬШЕНО з 0.1 на 0.3
-glove.position.y -= Math.sin(angle) * scale * 0.5;  // ЗБІЛЬШЕНО з 0.1 на 0.3
-        
-        // МАСШТАБУВАННЯ З ПЕРЕВЕРНУТИМИ PNG
-        if (handIndex === 1) {
-          glove.scale.set(-scale, -scale, 1); // Права рука - перевернуто
-        } else {
-          glove.scale.set(scale, -scale, 1); // Ліва рука - перевернуто
-        }
-        
-        // Vertical rotation
-        glove.rotation.z = angle - Math.PI / 2;
+  // Texture
+  const texture = this.gloveTextures.get(designName);
+  if (texture) {
+    glove.material.uniforms.map.value = texture;
+    glove.material.needsUpdate = true;
+  }
 
-        // Texture
-        const texture = this.gloveTextures.get(designName);
-        if (texture) {
-          glove.material.uniforms.map.value = texture;
-          glove.material.needsUpdate = true;
-        }
+  // Fade animation
+  this.handleFadeAnimation(glove, fadeState);
 
-        // Fade animation
-        this.handleFadeAnimation(glove, fadeState);
+  // Debug information
+  if (debugManager && debugManager.enabled) {
+    debugManager.drawLandmarks(landmarks, handIndex);
+    debugManager.drawBoundingBox(handData, glove.position, scale, glove.rotation.z);
+  }
 
-        // Debug information
-        if (debugManager && debugManager.enabled) {
-          debugManager.drawLandmarks(landmarks, handIndex);
-          debugManager.drawBoundingBox(handData, glove.position, scale, glove.rotation.z);
-        }
-
-        return {
-          position: { x: glove.position.x, y: glove.position.y },
-          scale: scale,
-          angle: angle,
-          screenPosition: {
-            x: centerX,
-            y: centerY
-          }
-        };
-      }
+  return {
+    position: { x: glove.position.x, y: glove.position.y },
+    scale: scale,
+    angle: angle,
+    screenPosition: {
+      x: centerX,
+      y: centerY
+    }
+  };
+}
 
       handleFadeAnimation(glove, fadeState) {
         const uniforms = glove.material.uniforms;
@@ -1284,5 +1282,6 @@ glove.position.y -= Math.sin(angle) * scale * 0.5;  // ЗБІЛЬШЕНО з 0.1
   </script>
 </body>
 </html>
+
 
 
