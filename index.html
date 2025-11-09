@@ -775,7 +775,19 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   }
 
   const { landmarks, wrist } = handData;
-  
+  // АВТОМАТИЧНЕ ВИЗНАЧЕННЯ ЛІВОЇ/ПРАВОЇ РУКИ
+const thumbBase = landmarks[1];
+const pinkyBase = landmarks[17];
+const handDirection = thumbBase.x - pinkyBase.x;
+
+// Якщо великий палець правіше за мізинець - це права рука
+if (handDirection > 0) {
+  // ПРАВА рука - не дзеркалимо
+  glove.scale.set(scale, -scale, 1);
+} else {
+  // ЛІВА рука - дзеркалимо
+  glove.scale.set(-scale, -scale, 1);
+}
   // ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
   const middleFingerTip = landmarks[12];
   const centerX = middleFingerTip.x * window.innerWidth;
@@ -1283,6 +1295,7 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   </script>
 </body>
 </html>
+
 
 
 
