@@ -802,8 +802,8 @@ scale = Math.max(300, Math.min(800, scale)); // ЗБІЛЬШЕНО мініма�
 glove.position.set(glovePosition.x, glovePosition.y, 0);
 
 // ВИПРАВЛЕНЕ ПОЗИЦІОНУВАННЯ - рукавиця на долоні
-glove.position.x += Math.cos(angle) * scale * 0.3;  // ЗБІЛЬШЕНО з 0.1 на 0.3
-glove.position.y -= Math.sin(angle) * scale * 0.3;  // ЗБІЛЬШЕНО з 0.1 на 0.3
+glove.position.x += Math.cos(angle) * scale * 0.5;  // ЗБІЛЬШЕНО з 0.1 на 0.3
+glove.position.y -= Math.sin(angle) * scale * 0.5;  // ЗБІЛЬШЕНО з 0.1 на 0.3
         
         // МАСШТАБУВАННЯ З ПЕРЕВЕРНУТИМИ PNG
         if (handIndex === 1) {
@@ -1284,4 +1284,5 @@ glove.position.y -= Math.sin(angle) * scale * 0.3;  // ЗБІЛЬШЕНО з 0.1
   </script>
 </body>
 </html>
+
 
