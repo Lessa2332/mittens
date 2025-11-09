@@ -312,7 +312,7 @@
     // ========== CONFIGURATION ==========
     const CONFIG = {
       SCALE: {
-        MULTIPLIER: 2.8,
+        MULTIPLIER: 5.6, // Збільшено в 2 рази
         MIN: 150,
         MAX: 600
       },
@@ -481,8 +481,7 @@
       drawLandmarks(landmarks, handIndex) {
         if (!this.enabled || !CONFIG.DEBUG.SHOW_LANDMARKS) return;
         
-        // Малюємо ключові точки руки
-        const keyPoints = [0, 5, 9, 13, 17]; // Зап'ястя, основи пальців
+        const keyPoints = [0, 5, 9, 13, 17];
         keyPoints.forEach(pointIndex => {
           const landmark = landmarks[pointIndex];
           const x = landmark.x * window.innerWidth;
@@ -490,7 +489,6 @@
           this.addPoint(x, y, handIndex === 0 ? '#ff0000' : '#0000ff');
         });
 
-        // Малюємо кінчик середнього пальця
         const middleFinger = landmarks[12];
         const mfX = middleFinger.x * window.innerWidth;
         const mfY = middleFinger.y * window.innerHeight;
@@ -503,10 +501,8 @@
         const centerX = glovePosition.x + window.innerWidth / 2;
         const centerY = glovePosition.y + window.innerHeight / 2;
         
-        // Малюємо центр рукавички
         this.addPoint(centerX, centerY, '#00ffff');
         
-        // Малюємо bounding box
         const halfWidth = scale / 2;
         const halfHeight = scale / 2;
         
@@ -526,7 +522,6 @@
           };
         });
         
-        // З'єднуємо кути
         for (let i = 0; i < rotatedCorners.length; i++) {
           const next = (i + 1) % rotatedCorners.length;
           this.addLine(
@@ -539,43 +534,42 @@
     }
 
     // ========== SERVICES ==========
-class AudioService {
-  constructor() {
-    // Використовуйте ваші файли з папки audio
-    this.bgMusic = new Audio('audio/christmas-bg.mp3');
-    this.click = new Audio('audio/click.mp3');
-    
-    this.bgMusic.loop = true;
-    this.bgMusic.volume = CONFIG.AUDIO.VOLUME;
-    this.click.volume = CONFIG.AUDIO.CLICK_VOLUME;
-    
-    // Додаємо обробку помилок завантаження аудіо
-    this.bgMusic.addEventListener('error', (e) => {
-      console.error('Failed to load background music:', e);
-    });
-    
-    this.click.addEventListener('error', (e) => {
-      console.error('Failed to load click sound:', e);
-    });
-  }
+    class AudioService {
+      constructor() {
+        this.bgMusic = new Audio('audio/christmas-bg.mp3');
+        this.click = new Audio('audio/click.mp3');
+        
+        this.bgMusic.loop = true;
+        this.bgMusic.volume = CONFIG.AUDIO.VOLUME;
+        this.click.volume = CONFIG.AUDIO.CLICK_VOLUME;
+        
+        this.bgMusic.addEventListener('error', (e) => {
+          console.error('Failed to load background music:', e);
+        });
+        
+        this.click.addEventListener('error', (e) => {
+          console.error('Failed to load click sound:', e);
+        });
+      }
 
-  playBackgroundMusic() {
-    this.bgMusic.play().catch((error) => {
-      console.debug('Background music play blocked or failed:', error);
-    });
-  }
+      playBackgroundMusic() {
+        this.bgMusic.play().catch((error) => {
+          console.debug('Background music play blocked or failed:', error);
+        });
+      }
 
-  pauseBackgroundMusic() {
-    this.bgMusic.pause();
-  }
+      pauseBackgroundMusic() {
+        this.bgMusic.pause();
+      }
 
-  playClick() {
-    this.click.currentTime = 0;
-    this.click.play().catch((error) => {
-      console.debug('Click sound play blocked or failed:', error);
-    });
-  }
-}
+      playClick() {
+        this.click.currentTime = 0;
+        this.click.play().catch((error) => {
+          console.debug('Click sound play blocked or failed:', error);
+        });
+      }
+    }
+
     class HandDetectionService {
       constructor() {
         this.handLandmarker = null;
@@ -786,14 +780,13 @@ class AudioService {
         const centerX = wrist.x * window.innerWidth;
         const centerY = (1 - wrist.y) * window.innerHeight;
         
-// Динамічний масштаб за розміром руки
-const getHandScale = (handLength) => {
-  return handLength * 0.14 * CONFIG.SCALE.MULTIPLIER;
-};
+        // УНІВЕРСАЛЬНИЙ МАСШТАБ ДЛЯ БУДЬ-ЯКОЇ РУКИ
+        const actualHandLength = 17; // в см - для дорослого
+        const baseScale = actualHandLength * 0.14;
 
-// Використання:
-const childHandScale = getHandScale(9);   // для дитини 9 см
-const adultHandScale = getHandScale(17);  // для дорослого 17 см
+        let scale = baseScale * CONFIG.SCALE.MULTIPLIER;
+        scale = Math.max(CONFIG.SCALE.MIN, Math.min(CONFIG.SCALE.MAX, scale));
+
         // Rotation
         const middleFinger = landmarks[12];
         const angle = Math.atan2(
@@ -812,14 +805,14 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
         glove.position.x += Math.cos(angle) * scale * 0.1;
         glove.position.y -= Math.sin(angle) * scale * 0.1;
         
-        // Mirror for right hand - ВІДЗЕРКАЛЕННЯ для правої руки
+        // МАСШТАБУВАННЯ З ПЕРЕВЕРНУТИМИ PNG
         if (handIndex === 1) {
-          glove.scale.set(-scale, scale, 1);
+          glove.scale.set(-scale, -scale, 1); // Права рука - перевернуто
         } else {
-          glove.scale.set(scale, scale, 1);
+          glove.scale.set(scale, -scale, 1); // Ліва рука - перевернуто
         }
         
-        // Vertical rotation - ПОВОРОТ у вертикальну позицію
+        // Vertical rotation
         glove.rotation.z = angle - Math.PI / 2;
 
         // Texture
@@ -1133,7 +1126,6 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
           const handLandmarks = landmarks[i];
           const wrist = handLandmarks[0];
           
-          // Update velocity
           const wristScreen = { 
             x: wrist.x * window.innerWidth, 
             y: wrist.y * window.innerHeight 
@@ -1165,7 +1157,6 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
       }
 
       updateSparkles() {
-        // Spawn new sparkles
         if (Math.random() < CONFIG.PERFORMANCE.SPARKLE_SPAWN_RATE) {
           this.sparkles.push(new SparkleParticle(
             Math.random() * window.innerWidth,
@@ -1173,7 +1164,6 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
           ));
         }
 
-        // Update existing sparkles
         const wristPos = this.gloveRenderer.palmGloves[0]?.visible ? {
           x: this.gloveRenderer.palmGloves[0].position.x + window.innerWidth / 2,
           y: this.gloveRenderer.palmGloves[0].position.y + window.innerHeight / 2
@@ -1181,12 +1171,10 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
 
         this.sparkles.forEach(p => p.update(wristPos, this.state.wristVelocity));
 
-        // Remove old sparkles
         while (this.sparkles.length > CONFIG.PERFORMANCE.MAX_SPARKLES) {
           this.sparkles.shift();
         }
         
-        // Draw sparkles
         this.confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         this.sparkles.forEach(p => p.draw(this.confettiCtx));
       }
@@ -1198,7 +1186,6 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
         debugInfo += `Design: ${this.state.currentDesign}<br>`;
         debugInfo += `Scale Multiplier: ${CONFIG.SCALE.MULTIPLIER}<br><br>`;
 
-        // Update gloves for each hand
         for (let i = 0; i < Math.max(this.state.hands.length, CONFIG.HANDS.MAX_HANDS); i++) {
           const gloveData = this.gloveRenderer.updateGlove(
             i, 
@@ -1219,16 +1206,13 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
           }
         }
 
-        // Update debug info
         this.debugManager.updateInfo(debugInfo);
 
-        // Update shader uniforms
         this.gloveRenderer.updateUniforms(
           performance.now() * 0.001,
           this.state.snowTime += 0.02
         );
 
-        // Render
         this.gloveRenderer.render();
       }
 
@@ -1297,10 +1281,6 @@ const adultHandScale = getHandScale(17);  // для дорослого 17 см
     window.addEventListener('DOMContentLoaded', () => {
       new GloveARApplication().initialize();
     });
-
   </script>
 </body>
 </html>
-
-
-
