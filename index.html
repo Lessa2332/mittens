@@ -801,14 +801,14 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   glove.position.x += Math.cos(angle) * scale * 0.2;
   glove.position.y -= Math.sin(angle) * scale * 0.2;
   
-  // ВИПРАВЛЕНЕ МАСШТАБУВАННЯ ТА ДЗЕРКАЛЕННЯ
-  if (handIndex === 1) {
-    // Права рука - тільки по X дзеркалимо
-    glove.scale.set(-scale, scale, 1);
-  } else {
-    // Ліва рука - не дзеркалимо
-    glove.scale.set(scale, scale, 1);
-  }
+// ВИПРАВЛЕНЕ МАСШТАБУВАННЯ - ПРАВИЛЬНА ОРІЄНТАЦІЯ
+if (handIndex === 1) {
+  // Права рука - дзеркалимо по X
+  glove.scale.set(-scale, scale, 1);
+} else {
+  // Ліва рука - не дзеркалимо
+  glove.scale.set(scale, scale, 1);
+}
   
   // Vertical rotation
   glove.rotation.z = angle - Math.PI / 2;
@@ -1282,6 +1282,7 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   </script>
 </body>
 </html>
+
 
 
 
