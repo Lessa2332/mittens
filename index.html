@@ -12,12 +12,14 @@
       box-sizing: border-box;
       touch-action: manipulation;
     }
+    
     body {
       background: linear-gradient(135deg, #1a2980, #26d0ce);
       overflow: hidden;
       font-family: 'Arial', 'Segoe UI', system-ui, sans-serif;
       color: white;
     }
+
     #video, #canvas, #confettiCanvas {
       position: absolute;
       top: 0;
@@ -26,6 +28,7 @@
       height: 100%;
       object-fit: cover;
     }
+
     #video { z-index: 1; display: none; }
     #canvas { z-index: 2; display: none; }
     #confettiCanvas { z-index: 3; pointer-events: none; }
@@ -48,7 +51,11 @@
       transition: all 0.3s ease;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
     }
-    .control-btn:hover { transform: scale(1.15); background: rgba(255, 255, 255, 0.3); }
+
+    .control-btn:hover { 
+      transform: scale(1.15); 
+      background: rgba(255, 255, 255, 0.3); 
+    }
 
     #langBtn { top: 20px; right: 20px; font-weight: bold; font-size: 16px; }
     #soundBtn { top: 20px; left: 20px; }
@@ -73,6 +80,7 @@
       box-shadow: 0 6px 20px rgba(38, 208, 206, 0.5), 0 0 0 4px #ffd700;
       animation: pulse-glow 2s infinite;
     }
+
     @keyframes pulse-glow {
       0%, 100% { box-shadow: 0 6px 20px rgba(38, 208, 206, 0.5), 0 0 0 4px #ffd700; }
       50% { box-shadow: 0 8px 30px rgba(38, 208, 206, 0.7), 0 0 0 6px #ffd700; }
@@ -95,7 +103,9 @@
       overflow-x: auto;
       scrollbar-width: none;
     }
+
     #designPicker::-webkit-scrollbar { display: none; }
+
     .design-btn {
       width: 60px;
       height: 90px;
@@ -107,8 +117,17 @@
       transition: all 0.3s ease;
       flex-shrink: 0;
     }
-    .design-btn:hover { transform: scale(1.1); border-color: rgba(255, 255, 255, 0.6); }
-    .design-btn.selected { transform: scale(1.15); border-color: #ffd700; box-shadow: 0 0 0 3px #ffd700; }
+
+    .design-btn:hover { 
+      transform: scale(1.1); 
+      border-color: rgba(255, 255, 255, 0.6); 
+    }
+
+    .design-btn.selected { 
+      transform: scale(1.15); 
+      border-color: #ffd700; 
+      box-shadow: 0 0 0 3px #ffd700; 
+    }
 
     #loading {
       position: fixed;
@@ -128,6 +147,7 @@
       padding: 20px;
       gap: 20px;
     }
+
     .loader {
       width: 60px;
       height: 60px;
@@ -136,6 +156,7 @@
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
+
     #loading p {
       color: #fff;
       font-size: clamp(14px, 3vw, 18px);
@@ -159,19 +180,48 @@
       z-index: 99;
       font-size: 14px;
     }
-    #handIndicator { top: 160px; }
-    .indicator.show { display: flex; animation: slideDown 0.3s ease; }
 
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #handIndicator { top: 160px; }
+
+    .indicator.show { 
+      display: flex; 
+      animation: slideDown 0.3s ease; 
+    }
+
+    @keyframes spin { 
+      0% { transform: rotate(0deg); } 
+      100% { transform: rotate(360deg); } 
+    }
+
     @keyframes slideDown {
-      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      from { 
+        opacity: 0; 
+        transform: translateX(-50%) translateY(-10px); 
+      }
+      to { 
+        opacity: 1; 
+        transform: translateX(-50%) translateY(0); 
+      }
     }
 
     @media (max-width: 768px) {
-      .control-btn { width: 44px; height: 44px; font-size: 17px; }
-      #authorBtn { width: 50px; height: 50px; top: 74px; font-size: 22px; }
-      .design-btn { width: 50px; height: 75px; }
+      .control-btn { 
+        width: 44px; 
+        height: 44px; 
+        font-size: 17px; 
+      }
+      
+      #authorBtn { 
+        width: 50px; 
+        height: 50px; 
+        top: 74px; 
+        font-size: 22px; 
+      }
+      
+      .design-btn { 
+        width: 50px; 
+        height: 75px; 
+      }
     }
   </style>
 </head>
@@ -212,223 +262,465 @@
     import * as THREE from 'three';
     import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
 
-    const translations = {
+    // ========== CONFIGURATION ==========
+    const CONFIG = {
+      SCALE: {
+        MULTIPLIER: 2.5,
+        MIN: 120,
+        MAX: 500
+      },
+      HANDS: {
+        MAX_HANDS: 2,
+        DETECTION_THRESHOLD: 10
+      },
+      PERFORMANCE: {
+        DETECTION_THROTTLE_MS: 50,
+        MAX_SPARKLES: 150,
+        SPARKLE_SPAWN_RATE: 0.08
+      },
+      AUDIO: {
+        VOLUME: 0.4,
+        CLICK_VOLUME: 0.5
+      },
+      DESIGNS: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+    };
+
+    // ========== TRANSLATIONS ==========
+    const TRANSLATIONS = {
       en: {
         title: "Christmas Gloves AR Try-On",
         loading: "Loading Christmas AR Experience...",
         cameraPrompt: "Please allow camera access",
         retry: "Retry",
-        handNotDetected: "Show your hand(s)"
+        handNotDetected: "Show your hand(s)",
+        errorCamera: "Camera access denied. Try Chrome or Safari.",
+        errorGeneral: "AR failed to load. Refresh page."
       },
       uk: {
         title: "Різдвяний AR-приміряльник рукавичок",
         loading: "Завантаження різдвяного AR...",
         cameraPrompt: "Будь ласка, дозвольте доступ до камери",
         retry: "Повторити",
-        handNotDetected: "Покажіть руку(руки)"
+        handNotDetected: "Покажіть руку(руки)",
+        errorCamera: "Доступ до камери заборонено. Спробуйте Chrome або Safari.",
+        errorGeneral: "AR не вдалося завантажити. Оновіть сторінку."
       }
     };
 
-    const state = {
-      currentLang: 'en',
-      currentDesign: "1",
-      isMuted: false,
-      lastLandmarks: null,
-      handNotDetectedCount: 0,
-      animationFrameId: null,
-      wristVelocity: { x: 0, y: 0 },
-      lastWristPos: null,
-      snowTime: 0,
-      isAudioUnlocked: false,
-      sparkles: [],
-      fadeOut: false,
-      fadeIn: false,
-      hands: [],
-      isInitialized: false
-    };
-
-    const elements = {
-      video: document.getElementById("video"),
-      canvas: document.getElementById("canvas"),
-      confettiCanvas: document.getElementById("confettiCanvas"),
-      loading: document.getElementById("loading"),
-      loadingText: document.getElementById("loadingText"),
-      langBtn: document.getElementById("langBtn"),
-      soundBtn: document.getElementById("soundBtn"),
-      authorBtn: document.getElementById("authorBtn"),
-      designPicker: document.getElementById("designPicker"),
-      handIndicator: document.getElementById("handIndicator")
-    };
-
-    const confettiCtx = elements.confettiCanvas.getContext("2d");
-    let sparkles = [];
-
-    function resizeCanvases() {
-      elements.confettiCanvas.width = window.innerWidth;
-      elements.confettiCanvas.height = window.innerHeight;
+    // ========== TYPES ==========
+    class AppState {
+      currentLang = 'en';
+      currentDesign = "1";
+      isMuted = false;
+      lastLandmarks = null;
+      handNotDetectedCount = 0;
+      animationFrameId = null;
+      wristVelocity = { x: 0, y: 0 };
+      lastWristPos = null;
+      snowTime = 0;
+      isAudioUnlocked = false;
+      fadeOut = false;
+      fadeIn = false;
+      hands = [];
+      isInitialized = false;
+      lastDetectionTime = 0;
     }
 
-    const audio = {
-      bgMusic: new Audio('https://assets.mixkit.co/music/preview/mixkit-christmas-magic-325.mp3'),
-      click: new Audio('https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3')
-    };
-    audio.bgMusic.loop = true;
-    audio.bgMusic.volume = 0.4;
-    audio.click.volume = 0.5;
-
-    const DESIGNS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
-    const gloveTextures = {};
-
-    let scene, camera, renderer;
-    let palmGloves = [];
-    let handLandmarker;
-
-    const GLOVE_SHADER = {
-      vertexShader: `
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
-        void main() {
-          vUv = uv;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          vViewPosition = -mvPosition.xyz;
-          vNormal = normalize(normalMatrix * normal);
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D map;
-        uniform float time;
-        uniform float shineIntensity;
-        uniform float fadeOpacity;
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
-
-        void main() {
-          vec4 texColor = texture2D(map, vUv);
-          if (texColor.a < 0.1) discard;
-          vec3 color = texColor.rgb;
-          float shine = smoothstep(0.3, 0.7, vUv.y + sin(vUv.y * 8.0 - time * 1.5) * 0.1);
-          shine = pow(shine, 2.0) * 0.5;
-          vec3 highlight = vec3(1.0, 1.0, 1.0) * shine * shineIntensity;
-          float fresnel = pow(1.0 - dot(normalize(vViewPosition), vNormal), 3.0);
-          vec3 rim = vec3(1.0, 1.0, 1.0) * fresnel * 0.3;
-          float shadow = smoothstep(0.0, 0.25, vUv.y);
-          color *= (1.0 - shadow * 0.25);
-          color = color + highlight + rim;
-          gl_FragColor = vec4(color, texColor.a * fadeOpacity);
-        }
-      `
-    };
-
-    class SparkleParticle {
-      constructor(x, y) {
-        this.x = x; this.y = y;
-        this.vx = (Math.random() - 0.5) * 0.5;
-        this.vy = Math.random() * 0.5 + 0.2;
-        this.size = Math.random() * 2 + 1;
-        this.life = 1.0;
-        this.stuck = false;
-        this.brightness = Math.random() * 0.5 + 0.5;
-        this.pulse = Math.random() * 2 * Math.PI;
+    // ========== SERVICES ==========
+    class AudioService {
+      constructor() {
+        this.bgMusic = new Audio('https://assets.mixkit.co/music/preview/mixkit-christmas-magic-325.mp3');
+        this.click = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3');
+        
+        this.bgMusic.loop = true;
+        this.bgMusic.volume = CONFIG.AUDIO.VOLUME;
+        this.click.volume = CONFIG.AUDIO.CLICK_VOLUME;
       }
-      update(wristPos = null, wristVel = null) {
-        if (this.stuck) return;
-        if (wristPos && wristVel && !this.stuck) {
-          const dx = this.x - wristPos.x;
-          const dy = this.y - wristPos.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < 150 && Math.hypot(wristVel.x, wristVel.y) > 50) {
-            const force = 3;
-            this.vx += (dx / dist) * force;
-            this.vy += (dy / dist) * force;
-          }
-        }
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy += 0.02;
-        this.vx *= 0.98;
-        if (this.y > window.innerHeight - 20) {
-          this.y = window.innerHeight - 20;
-          this.vy = 0;
-          this.vx = 0;
-          this.stuck = true;
-        }
-        if (this.x < -50 || this.x > window.innerWidth + 50) this.life = 0;
+
+      playBackgroundMusic() {
+        this.bgMusic.play().catch(() => console.debug('Audio play blocked'));
       }
-      draw(ctx) {
-        if (this.life <= 0) return;
-        ctx.save();
-        ctx.globalAlpha = this.life * 0.8 * this.brightness;
-        ctx.fillStyle = `hsl(${Math.sin(this.pulse + performance.now() * 0.001) * 30 + 60}, 100%, ${Math.sin(this.pulse + performance.now() * 0.001) * 20 + 80}%)`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+
+      pauseBackgroundMusic() {
+        this.bgMusic.pause();
+      }
+
+      playClick() {
+        this.click.currentTime = 0;
+        this.click.play().catch(() => console.debug('Click sound blocked'));
       }
     }
 
-    class GloveARApp {
-      constructor() { this.init(); }
+    class HandDetectionService {
+      constructor() {
+        this.handLandmarker = null;
+        this.isInitialized = false;
+      }
 
-      async init() {
+      async initialize() {
         try {
-          this.setupEventListeners();
+          const vision = await FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+          );
+          
+          this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+            baseOptions: { 
+              modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", 
+              delegate: "GPU" 
+            },
+            runningMode: "VIDEO",
+            numHands: CONFIG.HANDS.MAX_HANDS
+          });
+          
+          this.isInitialized = true;
+          return true;
+        } catch (error) {
+          console.error('Hand detection initialization failed:', error);
+          throw new Error('HAND_DETECTION_INIT_FAILED');
+        }
+      }
+
+      detectHands(videoElement) {
+        if (!this.isInitialized || videoElement.readyState < 2) {
+          return null;
+        }
+
+        const now = performance.now();
+        if (now - this.lastDetectionTime < CONFIG.PERFORMANCE.DETECTION_THROTTLE_MS) {
+          return this.lastResult;
+        }
+
+        this.lastDetectionTime = now;
+        
+        try {
+          this.lastResult = this.handLandmarker.detectForVideo(videoElement, now);
+          return this.lastResult;
+        } catch (error) {
+          console.error('Hand detection error:', error);
+          return null;
+        }
+      }
+
+      cleanup() {
+        if (this.handLandmarker) {
+          this.handLandmarker.close();
+          this.handLandmarker = null;
+        }
+        this.isInitialized = false;
+      }
+    }
+
+    class GloveRenderer {
+      constructor() {
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.palmGloves = [];
+        this.gloveTextures = new Map();
+      }
+
+      initialize(canvasElement) {
+        this.scene = new THREE.Scene();
+        
+        this.camera = new THREE.OrthographicCamera(
+          -window.innerWidth / 2, 
+          window.innerWidth / 2,
+          window.innerHeight / 2, 
+          -window.innerHeight / 2,
+          0.1, 
+          1000
+        );
+        this.camera.position.z = 10;
+        
+        this.renderer = new THREE.WebGLRenderer({ 
+          canvas: canvasElement, 
+          alpha: true, 
+          antialias: true,
+          powerPreference: "high-performance"
+        });
+        
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        this.createGloves();
+      }
+
+      createGloves() {
+        const shaderMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            map: { value: null },
+            time: { value: 0 },
+            shineIntensity: { value: 1.0 },
+            fadeOpacity: { value: 1.0 }
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            void main() {
+              vUv = uv;
+              vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+              vViewPosition = -mvPosition.xyz;
+              vNormal = normalize(normalMatrix * normal);
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D map;
+            uniform float time;
+            uniform float shineIntensity;
+            uniform float fadeOpacity;
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+
+            void main() {
+              vec4 texColor = texture2D(map, vUv);
+              if (texColor.a < 0.1) discard;
+              vec3 color = texColor.rgb;
+              float shine = smoothstep(0.3, 0.7, vUv.y + sin(vUv.y * 8.0 - time * 1.5) * 0.1);
+              shine = pow(shine, 2.0) * 0.5;
+              vec3 highlight = vec3(1.0, 1.0, 1.0) * shine * shineIntensity;
+              float fresnel = pow(1.0 - dot(normalize(vViewPosition), vNormal), 3.0);
+              vec3 rim = vec3(1.0, 1.0, 1.0) * fresnel * 0.3;
+              float shadow = smoothstep(0.0, 0.25, vUv.y);
+              color *= (1.0 - shadow * 0.25);
+              color = color + highlight + rim;
+              gl_FragColor = vec4(color, texColor.a * fadeOpacity);
+            }
+          `,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthTest: false,
+          depthWrite: false
+        });
+
+        for (let i = 0; i < CONFIG.HANDS.MAX_HANDS; i++) {
+          const geometry = new THREE.PlaneGeometry(1, 1);
+          const glove = new THREE.Mesh(geometry, shaderMaterial.clone());
+          glove.visible = false;
+          this.scene.add(glove);
+          this.palmGloves.push(glove);
+        }
+      }
+
+      async loadTextures() {
+        const loadPromises = CONFIG.DESIGNS.map(name => 
+          new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = `gloves/winter/${name}.png`;
+            
+            img.onload = () => {
+              const texture = new THREE.TextureLoader().load(`gloves/winter/${name}.png`);
+              texture.minFilter = THREE.LinearFilter;
+              texture.magFilter = THREE.LinearFilter;
+              this.gloveTextures.set(name, texture);
+              resolve();
+            };
+            
+            img.onerror = () => {
+              console.warn(`Failed to load design ${name}, using fallback`);
+              this.createFallbackTexture(name);
+              resolve();
+            };
+          })
+        );
+
+        await Promise.all(loadPromises);
+      }
+
+      createFallbackTexture(name) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#1a2980';
+        ctx.fillRect(0, 0, 200, 200);
+        ctx.fillStyle = 'white';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Design ${name}`, 100, 110);
+        
+        this.gloveTextures.set(name, new THREE.CanvasTexture(canvas));
+      }
+
+      updateGlove(handIndex, handData, designName, fadeState) {
+        const glove = this.palmGloves[handIndex];
+        if (!glove || !handData) {
+          glove.visible = false;
+          return;
+        }
+
+        const { landmarks, wrist } = handData;
+        
+        // Position
+        const centerX = wrist.x * window.innerWidth;
+        const centerY = (1 - wrist.y) * window.innerHeight;
+        
+        // Scale
+        const handWidth = Math.hypot(
+          (landmarks[5].x - landmarks[17].x) * window.innerWidth,
+          (landmarks[5].y - landmarks[17].y) * window.innerHeight
+        );
+        
+        let scale = handWidth * CONFIG.SCALE.MULTIPLIER;
+        scale = Math.max(CONFIG.SCALE.MIN, Math.min(CONFIG.SCALE.MAX, scale));
+
+        // Rotation
+        const middleFinger = landmarks[12];
+        const angle = Math.atan2(
+          middleFinger.y - wrist.y,
+          middleFinger.x - wrist.x
+        );
+
+        glove.position.set(
+          centerX - window.innerWidth / 2, 
+          centerY - window.innerHeight / 2, 
+          0
+        );
+        
+        // Offset for better positioning
+        glove.position.x += Math.cos(angle) * scale * 0.1;
+        glove.position.y -= Math.sin(angle) * scale * 0.1;
+        
+        // Mirror for right hand
+        if (handIndex === 1) {
+          glove.scale.set(-scale, scale, 1);
+        } else {
+          glove.scale.set(scale, scale, 1);
+        }
+        
+        // Vertical rotation
+        glove.rotation.z = angle - Math.PI / 2;
+
+        // Texture
+        const texture = this.gloveTextures.get(designName);
+        if (texture) {
+          glove.material.uniforms.map.value = texture;
+          glove.material.needsUpdate = true;
+        }
+
+        // Fade animation
+        this.handleFadeAnimation(glove, fadeState);
+        
+        glove.visible = true;
+      }
+
+      handleFadeAnimation(glove, fadeState) {
+        const uniforms = glove.material.uniforms;
+        
+        if (fadeState.fadeOut) {
+          uniforms.fadeOpacity.value = Math.max(0, uniforms.fadeOpacity.value - 0.05);
+          if (uniforms.fadeOpacity.value <= 0) {
+            glove.visible = false;
+          }
+        } else if (fadeState.fadeIn) {
+          uniforms.fadeOpacity.value = Math.min(1, uniforms.fadeOpacity.value + 0.05);
+          if (uniforms.fadeOpacity.value >= 1) {
+            fadeState.fadeIn = false;
+          }
+          glove.visible = true;
+        } else {
+          uniforms.fadeOpacity.value = 1;
+          glove.visible = true;
+        }
+      }
+
+      updateUniforms(time, snowTime) {
+        this.palmGloves.forEach(glove => {
+          glove.material.uniforms.time.value = time;
+          glove.material.uniforms.shineIntensity.value = 
+            0.8 + 0.2 * Math.sin(snowTime);
+        });
+      }
+
+      resize() {
+        if (!this.camera || !this.renderer) return;
+        
+        this.camera.left = -window.innerWidth / 2;
+        this.camera.right = window.innerWidth / 2;
+        this.camera.top = window.innerHeight / 2;
+        this.camera.bottom = -window.innerHeight / 2;
+        this.camera.updateProjectionMatrix();
+        
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      render() {
+        if (this.scene && this.camera) {
+          this.renderer.render(this.scene, this.camera);
+        }
+      }
+
+      cleanup() {
+        this.palmGloves.forEach(glove => {
+          glove.geometry.dispose();
+          glove.material.dispose();
+        });
+        
+        this.gloveTextures.forEach(texture => texture.dispose());
+        
+        if (this.renderer) {
+          this.renderer.dispose();
+        }
+      }
+    }
+
+    // ========== MAIN APPLICATION ==========
+    class GloveARApplication {
+      constructor() {
+        this.state = new AppState();
+        this.audioService = new AudioService();
+        this.handDetection = new HandDetectionService();
+        this.gloveRenderer = new GloveRenderer();
+        this.sparkles = [];
+        
+        this.elements = {
+          video: document.getElementById("video"),
+          canvas: document.getElementById("canvas"),
+          confettiCanvas: document.getElementById("confettiCanvas"),
+          loading: document.getElementById("loading"),
+          loadingText: document.getElementById("loadingText"),
+          langBtn: document.getElementById("langBtn"),
+          soundBtn: document.getElementById("soundBtn"),
+          designPicker: document.getElementById("designPicker"),
+          handIndicator: document.getElementById("handIndicator")
+        };
+
+        this.confettiCtx = this.elements.confettiCanvas.getContext("2d");
+        this.bindEvents();
+      }
+
+      async initialize() {
+        try {
           await this.setupCamera();
-          await this.initWebGL();
-          await this.setupHandTracking();
-          await this.loadResources();
+          this.gloveRenderer.initialize(this.elements.canvas);
+          await this.handDetection.initialize();
+          await this.gloveRenderer.loadTextures();
+          this.buildDesignUI();
           this.updateUI();
           this.hideLoading();
           this.startRenderLoop();
-          this.unlockAudio();
-          state.isInitialized = true;
+          this.setupAudioUnlock();
+          this.state.isInitialized = true;
         } catch (error) {
           this.handleError(error);
         }
       }
 
-      unlockAudio() {
-        const unlock = () => {
-          state.isAudioUnlocked = true;
-          if (!state.isMuted) audio.bgMusic.play().catch(() => {});
-          document.removeEventListener('click', unlock);
-          document.removeEventListener('touchstart', unlock);
-        };
-        document.addEventListener('click', unlock, { once: true });
-        document.addEventListener('touchstart', unlock, { once: true });
-      }
-
-      playSound(sound) {
-        if (state.isMuted || !state.isAudioUnlocked) return;
-        try { sound.currentTime = 0; sound.play(); } catch (e) {}
-      }
-
-      toggleSound() {
-        state.isMuted = !state.isMuted;
-        if (state.isMuted) audio.bgMusic.pause();
-        else if (state.isAudioUnlocked) audio.bgMusic.play().catch(() => {});
-        elements.soundBtn.textContent = state.isMuted ? '🔇' : '🔊';
-        this.playSound(audio.click);
-      }
-
-      toggleLanguage() {
-        state.currentLang = state.currentLang === 'en' ? 'uk' : 'en';
-        elements.langBtn.textContent = state.currentLang === 'en' ? 'UK' : 'EN';
-        this.updateUI();
-        this.playSound(audio.click);
-      }
-
-      setupEventListeners() {
-        elements.langBtn.addEventListener('click', () => this.toggleLanguage());
-        elements.soundBtn.addEventListener('click', () => this.toggleSound());
-        window.addEventListener('resize', () => { 
-          resizeCanvases();
-          if (state.isInitialized) {
-            this.handleResize();
+      bindEvents() {
+        this.elements.langBtn.addEventListener('click', () => this.toggleLanguage());
+        this.elements.soundBtn.addEventListener('click', () => this.toggleSound());
+        
+        window.addEventListener('resize', () => {
+          this.resizeCanvases();
+          if (this.state.isInitialized) {
+            this.gloveRenderer.resize();
           }
         });
+
         window.addEventListener('beforeunload', () => this.cleanup());
       }
 
@@ -443,17 +735,17 @@
             }
           });
           
-          elements.video.srcObject = stream;
+          this.elements.video.srcObject = stream;
           
           await new Promise((resolve, reject) => {
-            elements.video.onloadedmetadata = () => {
-              elements.video.play().then(resolve).catch(reject);
+            this.elements.video.onloadedmetadata = () => {
+              this.elements.video.play().then(resolve).catch(reject);
             };
-            elements.video.onerror = reject;
+            this.elements.video.onerror = reject;
             
             setTimeout(() => {
-              if (elements.video.readyState >= 1) {
-                elements.video.play().then(resolve).catch(reject);
+              if (this.elements.video.readyState >= 1) {
+                this.elements.video.play().then(resolve).catch(reject);
               }
             }, 1000);
           });
@@ -464,356 +756,258 @@
         }
       }
 
-      async initWebGL() {
-        scene = new THREE.Scene();
-        camera = new THREE.OrthographicCamera(
-          -window.innerWidth / 2, window.innerWidth / 2,
-          window.innerHeight / 2, -window.innerHeight / 2,
-          0.1, 1000
-        );
-        camera.position.z = 10;
+      setupAudioUnlock() {
+        const unlock = () => {
+          this.state.isAudioUnlocked = true;
+          if (!this.state.isMuted) {
+            this.audioService.playBackgroundMusic();
+          }
+          document.removeEventListener('click', unlock);
+          document.removeEventListener('touchstart', unlock);
+        };
         
-        renderer = new THREE.WebGLRenderer({ 
-          canvas: elements.canvas, 
-          alpha: true, 
-          antialias: true,
-          powerPreference: "high-performance"
-        });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.addEventListener('click', unlock, { once: true });
+        document.addEventListener('touchstart', unlock, { once: true });
+      }
 
-        for (let i = 0; i < 2; i++) {
-          const shaderMaterial = new THREE.ShaderMaterial({
-            uniforms: {
-              map: { value: null },
-              time: { value: 0 },
-              shineIntensity: { value: 1.0 },
-              fadeOpacity: { value: 1.0 }
-            },
-            vertexShader: GLOVE_SHADER.vertexShader,
-            fragmentShader: GLOVE_SHADER.fragmentShader,
-            transparent: true,
-            side: THREE.DoubleSide,
-            depthTest: false,
-            depthWrite: false
-          });
-
-          const geometry = new THREE.PlaneGeometry(1, 1);
-          const glove = new THREE.Mesh(geometry, shaderMaterial);
-          glove.visible = false;
-          scene.add(glove);
-          palmGloves.push(glove);
+      toggleSound() {
+        this.state.isMuted = !this.state.isMuted;
+        
+        if (this.state.isMuted) {
+          this.audioService.pauseBackgroundMusic();
+          this.elements.soundBtn.textContent = '🔇';
+        } else {
+          if (this.state.isAudioUnlocked) {
+            this.audioService.playBackgroundMusic();
+          }
+          this.elements.soundBtn.textContent = '🔊';
         }
+        
+        this.audioService.playClick();
       }
 
-      async setupHandTracking() {
-        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-        handLandmarker = await HandLandmarker.createFromOptions(vision, {
-          baseOptions: { 
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", 
-            delegate: "GPU" 
-          },
-          runningMode: "VIDEO",
-          numHands: 2
-        });
-      }
-
-      async loadResources() {
-        const loadImage = (name) => new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.src = `gloves/winter/${name}.png`;
-          img.onload = () => {
-            const texture = new THREE.TextureLoader().load(`gloves/winter/${name}.png`);
-            texture.minFilter = THREE.LinearFilter;
-            texture.magFilter = THREE.LinearFilter;
-            gloveTextures[name] = texture;
-            resolve();
-          };
-          img.onerror = () => {
-            console.warn(`Failed to load design ${name}`);
-            const canvas = document.createElement('canvas');
-            canvas.width = 200; canvas.height = 200;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#1a2980'; 
-            ctx.fillRect(0, 0, 200, 200);
-            ctx.fillStyle = 'white'; 
-            ctx.font = '16px Arial'; 
-            ctx.textAlign = 'center';
-            ctx.fillText(`Design ${name}`, 100, 110);
-            gloveTextures[name] = new THREE.CanvasTexture(canvas);
-            resolve();
-          };
-        });
-        await Promise.all(DESIGNS.map(loadImage));
-        this.buildDesignUI();
+      toggleLanguage() {
+        this.state.currentLang = this.state.currentLang === 'en' ? 'uk' : 'en';
+        this.elements.langBtn.textContent = this.state.currentLang === 'en' ? 'UK' : 'EN';
+        this.updateUI();
+        this.audioService.playClick();
       }
 
       buildDesignUI() {
-        elements.designPicker.innerHTML = '';
-        DESIGNS.forEach(name => {
+        this.elements.designPicker.innerHTML = '';
+        
+        CONFIG.DESIGNS.forEach(name => {
           const btn = document.createElement('img');
           btn.src = `gloves/winter/${name}.png`;
-          btn.className = `design-btn ${name === state.currentDesign ? 'selected' : ''}`;
+          btn.className = `design-btn ${name === this.state.currentDesign ? 'selected' : ''}`;
           btn.alt = `Design ${name}`;
+          
           btn.addEventListener('click', () => {
-            state.fadeOut = true;
+            this.state.fadeOut = true;
+            
             setTimeout(() => {
-              state.currentDesign = name;
-              document.querySelectorAll('.design-btn').forEach(b => b.classList.toggle('selected', b === btn));
-              state.fadeIn = true;
-              state.fadeOut = false;
-              this.playSound(audio.click);
+              this.state.currentDesign = name;
+              document.querySelectorAll('.design-btn').forEach(b => 
+                b.classList.toggle('selected', b === btn)
+              );
+              
+              this.state.fadeIn = true;
+              this.state.fadeOut = false;
+              this.audioService.playClick();
               this.triggerSparkleExplosion();
             }, 300);
           });
-          elements.designPicker.appendChild(btn);
+          
+          this.elements.designPicker.appendChild(btn);
         });
       }
 
       triggerSparkleExplosion() {
         for (let i = 0; i < 20; i++) {
-          const rect = elements.designPicker.getBoundingClientRect();
+          const rect = this.elements.designPicker.getBoundingClientRect();
           const x = rect.left + Math.random() * rect.width;
           const y = rect.top + Math.random() * rect.height;
-          sparkles.push(new SparkleParticle(x, y));
+          this.sparkles.push(new SparkleParticle(x, y));
         }
       }
 
       startRenderLoop() {
         const render = () => {
-          this.detectHands();
+          this.detectAndUpdateHands();
           this.updateSparkles();
-          this.renderScene();
-          state.animationFrameId = requestAnimationFrame(render);
+          this.renderFrame();
+          this.state.animationFrameId = requestAnimationFrame(render);
         };
         render();
       }
 
-      detectHands() {
-        if (!handLandmarker || elements.video.readyState < 2) return;
-        try {
-          const predictions = handLandmarker.detectForVideo(elements.video, performance.now());
-          if (predictions.landmarks?.length > 0) {
-            state.handNotDetectedCount = 0;
-            elements.handIndicator.classList.remove('show');
-            state.lastLandmarks = predictions.landmarks;
+      detectAndUpdateHands() {
+        const predictions = this.handDetection.detectHands(this.elements.video);
+        
+        if (predictions?.landmarks?.length > 0) {
+          this.state.handNotDetectedCount = 0;
+          this.elements.handIndicator.classList.remove('show');
+          this.state.lastLandmarks = predictions.landmarks;
 
-            for (let i = 0; i < predictions.landmarks.length; i++) {
-              const landmarks = predictions.landmarks[i];
-              const wrist = landmarks[0];
-              const middleMCP = landmarks[9];
-              const wristScreen = { 
-                x: wrist.x * window.innerWidth, 
-                y: wrist.y * window.innerHeight 
-              };
-              
-              if (!state.lastWristPos) state.lastWristPos = [];
-              if (state.lastWristPos[i]) {
-                state.wristVelocity.x = wristScreen.x - state.lastWristPos[i].x;
-                state.wristVelocity.y = wristScreen.y - state.lastWristPos[i].y;
-              }
-              state.lastWristPos[i] = wristScreen;
-
-              state.hands[i] = {
-                landmarks,
-                wrist,
-                middleMCP,
-                screenX: wrist.x * window.innerWidth,
-                screenY: (1 - wrist.y) * window.innerHeight,
-                distance: Math.hypot(
-                  (middleMCP.x - wrist.x) * window.innerWidth,
-                  (middleMCP.y - wrist.y) * window.innerHeight
-                )
-              };
-            }
-          } else {
-            state.handNotDetectedCount++;
-            if (state.handNotDetectedCount > 10) {
-              elements.handIndicator.classList.add('show');
-              // Виправлено: приховуємо тільки рукавички для рук, яких не видно
-              for (let i = 0; i < palmGloves.length; i++) {
-                if (!state.lastLandmarks?.[i]) {
-                  palmGloves[i].visible = false;
-                }
-              }
-              state.lastWristPos = null;
-            }
+          this.updateHandData(predictions.landmarks);
+        } else {
+          this.state.handNotDetectedCount++;
+          if (this.state.handNotDetectedCount > CONFIG.HANDS.DETECTION_THRESHOLD) {
+            this.elements.handIndicator.classList.add('show');
+            this.hideAllGloves();
           }
-        } catch (e) { 
-          console.error('Hand detection error:', e); 
         }
       }
 
+      updateHandData(landmarks) {
+        this.state.hands = [];
+        
+        for (let i = 0; i < landmarks.length; i++) {
+          const handLandmarks = landmarks[i];
+          const wrist = handLandmarks[0];
+          
+          // Update velocity
+          const wristScreen = { 
+            x: wrist.x * window.innerWidth, 
+            y: wrist.y * window.innerHeight 
+          };
+          
+          if (!this.state.lastWristPos) this.state.lastWristPos = [];
+          
+          if (this.state.lastWristPos[i]) {
+            this.state.wristVelocity.x = wristScreen.x - this.state.lastWristPos[i].x;
+            this.state.wristVelocity.y = wristScreen.y - this.state.lastWristPos[i].y;
+          }
+          
+          this.state.lastWristPos[i] = wristScreen;
+
+          this.state.hands[i] = {
+            landmarks: handLandmarks,
+            wrist,
+            screenX: wrist.x * window.innerWidth,
+            screenY: (1 - wrist.y) * window.innerHeight
+          };
+        }
+      }
+
+      hideAllGloves() {
+        this.gloveRenderer.palmGloves.forEach(glove => {
+          glove.visible = false;
+        });
+        this.state.lastWristPos = null;
+      }
+
       updateSparkles() {
-        if (Math.random() < 0.08) {
-          sparkles.push(new SparkleParticle(
+        // Spawn new sparkles
+        if (Math.random() < CONFIG.PERFORMANCE.SPARKLE_SPAWN_RATE) {
+          this.sparkles.push(new SparkleParticle(
             Math.random() * window.innerWidth,
             -10
           ));
         }
 
-        sparkles.forEach(p => p.update(
-          palmGloves[0]?.visible ? {
-            x: palmGloves[0].position.x + window.innerWidth / 2,
-            y: palmGloves[0].position.y + window.innerHeight / 2
-          } : null,
-          state.wristVelocity
-        ));
+        // Update existing sparkles
+        const wristPos = this.gloveRenderer.palmGloves[0]?.visible ? {
+          x: this.gloveRenderer.palmGloves[0].position.x + window.innerWidth / 2,
+          y: this.gloveRenderer.palmGloves[0].position.y + window.innerHeight / 2
+        } : null;
 
-        while (sparkles.length > 150) sparkles.shift();
+        this.sparkles.forEach(p => p.update(wristPos, this.state.wristVelocity));
+
+        // Remove old sparkles
+        while (this.sparkles.length > CONFIG.PERFORMANCE.MAX_SPARKLES) {
+          this.sparkles.shift();
+        }
         
-        confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        sparkles.forEach(p => p.draw(confettiCtx));
+        // Draw sparkles
+        this.confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        this.sparkles.forEach(p => p.draw(this.confettiCtx));
       }
 
-      renderScene() {
-        if (!state.lastLandmarks || palmGloves.length === 0) return;
+      renderFrame() {
+        if (!this.state.lastLandmarks) return;
 
-        for (let i = 0; i < state.hands.length; i++) {
-          const hand = state.hands[i];
-          if (!hand) continue;
-          
-          const glove = palmGloves[i];
-          if (!glove) continue;
-
-          // Центрування
-          const centerX = hand.wrist.x * window.innerWidth;
-          const centerY = (1 - hand.wrist.y) * window.innerHeight;
-          
-          // Розмір - ЗБІЛЬШЕНО до 2.5
-          const handWidth = Math.hypot(
-            (hand.landmarks[5].x - hand.landmarks[17].x) * window.innerWidth,
-            (hand.landmarks[5].y - hand.landmarks[17].y) * window.innerHeight
-          );
-          let scale = handWidth * 2.5; // ЗБІЛЬШЕНО з 1.8 до 2.5
-          scale = Math.max(120, Math.min(500, scale)); // Розширено діапазон
-
-          // Кут
-          const middleFinger = hand.landmarks[12];
-          const wrist = hand.landmarks[0];
-          const angle = Math.atan2(
-            middleFinger.y - wrist.y,
-            middleFinger.x - wrist.x
-          );
-
-          glove.position.set(
-            centerX - window.innerWidth / 2, 
-            centerY - window.innerHeight / 2, 
-            0
-          );
-          
-          // Зміщення для центрування
-          glove.position.x += Math.cos(angle) * scale * 0.1;
-          glove.position.y -= Math.sin(angle) * scale * 0.1;
-          
-          // ВІДЗЕРКАЛЕННЯ для правої руки
-          if (i === 1) { // Права рука
-            glove.scale.set(-scale, scale, 1);
-          } else { // Ліва рука
-            glove.scale.set(scale, scale, 1);
-          }
-          
-          // ПОВОРОТ у вертикальну позицію
-          glove.rotation.z = angle - Math.PI / 2;
-
-          // Текстура
-          if (gloveTextures[state.currentDesign]) {
-            glove.material.uniforms.map.value = gloveTextures[state.currentDesign];
-            glove.material.needsUpdate = true;
-          }
-
-          // Анімація зникнення/появи
-          if (state.fadeOut) {
-            glove.material.uniforms.fadeOpacity.value = Math.max(
-              0, 
-              glove.material.uniforms.fadeOpacity.value - 0.05
-            );
-            if (glove.material.uniforms.fadeOpacity.value <= 0) {
-              glove.visible = false;
+        // Update gloves for each hand
+        for (let i = 0; i < this.state.hands.length; i++) {
+          this.gloveRenderer.updateGlove(
+            i, 
+            this.state.hands[i], 
+            this.state.currentDesign, 
+            {
+              fadeOut: this.state.fadeOut,
+              fadeIn: this.state.fadeIn
             }
-          } else if (state.fadeIn) {
-            glove.material.uniforms.fadeOpacity.value = Math.min(
-              1, 
-              glove.material.uniforms.fadeOpacity.value + 0.05
-            );
-            if (glove.material.uniforms.fadeOpacity.value >= 1) {
-              state.fadeIn = false;
-            }
-            glove.visible = true;
-          } else {
-            glove.material.uniforms.fadeOpacity.value = 1;
-            glove.visible = true;
-          }
-
-          glove.material.uniforms.time.value = performance.now() * 0.001;
-          glove.material.uniforms.shineIntensity.value = 
-            0.8 + 0.2 * Math.sin(state.snowTime += 0.02);
+          );
         }
 
-        renderer.render(scene, camera);
+        // Update shader uniforms
+        this.gloveRenderer.updateUniforms(
+          performance.now() * 0.001,
+          this.state.snowTime += 0.02
+        );
+
+        // Render
+        this.gloveRenderer.render();
       }
 
-      handleResize() {
-        if (!camera || !renderer) return;
-        
-        camera.left = -window.innerWidth / 2;
-        camera.right = window.innerWidth / 2;
-        camera.top = window.innerHeight / 2;
-        camera.bottom = -window.innerHeight / 2;
-        camera.updateProjectionMatrix();
-        
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        resizeCanvases();
+      resizeCanvases() {
+        this.elements.confettiCanvas.width = window.innerWidth;
+        this.elements.confettiCanvas.height = window.innerHeight;
       }
 
       updateUI() {
-        const t = translations[state.currentLang];
+        const t = TRANSLATIONS[this.state.currentLang];
         document.title = t.title;
-        elements.loadingText.textContent = t.loading;
+        this.elements.loadingText.textContent = t.loading;
         document.querySelector('#loading p').textContent = t.cameraPrompt;
-        elements.handIndicator.innerHTML = `<span>👐</span><span>${t.handNotDetected}</span>`;
+        this.elements.handIndicator.innerHTML = 
+          `<span>👐</span><span>${t.handNotDetected}</span>`;
       }
 
       hideLoading() {
-        elements.loading.style.display = 'none';
-        elements.video.style.display = 'block';
-        elements.canvas.style.display = 'block';
+        this.elements.loading.style.display = 'none';
+        this.elements.video.style.display = 'block';
+        this.elements.canvas.style.display = 'block';
       }
 
       handleError(error) {
-        console.error('App error:', error);
-        const t = translations[state.currentLang];
+        console.error('Application error:', error);
+        const t = TRANSLATIONS[this.state.currentLang];
+        
         let message = error.message === 'CAMERA_ERROR' ? 
-          'Camera access denied. Try Chrome or Safari.' : 
-          'AR failed to load. Refresh page.';
+          t.errorCamera : t.errorGeneral;
           
-        elements.loading.innerHTML = `
+        this.elements.loading.innerHTML = `
           <div style="color: #ff4757; font-size: 24px; margin-bottom: 20px;">Error</div>
           <div style="color: white; font-size: 18px; margin-bottom: 20px; line-height: 1.4;">${message}</div>
-          <button id="errorRetry">${t.retry}</button>
+          <button id="errorRetry" style="
+            padding: 12px 24px;
+            background: #ffd700;
+            border: none;
+            border-radius: 25px;
+            color: #1a2980;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+          ">${t.retry}</button>
         `;
-        elements.loading.style.display = 'flex';
+        
+        this.elements.loading.style.display = 'flex';
         document.getElementById('errorRetry').onclick = () => location.reload();
       }
 
       cleanup() {
-        if (state.animationFrameId) {
-          cancelAnimationFrame(state.animationFrameId);
+        if (this.state.animationFrameId) {
+          cancelAnimationFrame(this.state.animationFrameId);
         }
-        if (elements.video.srcObject) {
-          elements.video.srcObject.getTracks().forEach(track => track.stop());
+        
+        if (this.elements.video.srcObject) {
+          this.elements.video.srcObject.getTracks().forEach(track => track.stop());
         }
-        if (handLandmarker) {
-          handLandmarker.close();
-        }
+        
+        this.handDetection.cleanup();
+        this.gloveRenderer.cleanup();
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-      resizeCanvases();
-      new GloveARApp();
-    });
-  </script>
-</body>
-</html>
+    // Sparkle
