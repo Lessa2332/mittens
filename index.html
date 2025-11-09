@@ -243,7 +243,7 @@
       sparkles: [],
       fadeOut: false,
       fadeIn: false,
-      hands: [] // Для підтримки двох рук
+      hands: []
     };
 
     const elements = {
@@ -269,7 +269,6 @@
     resizeCanvases();
     window.addEventListener('resize', resizeCanvases);
 
-    // Audio
     const audio = {
       bgMusic: new Audio('audio/christmas-bg.mp3'),
       click: new Audio('audio/click.mp3')
@@ -282,7 +281,7 @@
     const gloveTextures = {};
 
     let scene, camera, renderer;
-    let palmGloves = []; // Масив для двох рук
+    let palmGloves = [];
     let handLandmarker;
 
     const GLOVE_SHADER = {
@@ -337,8 +336,6 @@
       }
       update(wristPos = null, wristVel = null) {
         if (this.stuck) return;
-
-        // Розліт при русі руки
         if (wristPos && wristVel && !this.stuck) {
           const dx = this.x - wristPos.x;
           const dy = this.y - wristPos.y;
@@ -349,13 +346,10 @@
             this.vy += (dy / dist) * force;
           }
         }
-
         this.x += this.vx;
         this.y += this.vy;
-        this.vy += 0.02; // гравітація
+        this.vy += 0.02;
         this.vx *= 0.98;
-
-        // Внизу накопичуємо
         if (this.y > window.innerHeight - 20) {
           this.y = window.innerHeight - 20;
           this.vy = 0;
@@ -407,8 +401,6 @@
         document.addEventListener('touchstart', unlock, { once: true });
       }
 
-      setupAudio() {}
-
       playSound(sound) {
         if (state.isMuted || !state.isAudioUnlocked) return;
         try { sound.currentTime = 0; sound.play(); } catch (e) {}
@@ -437,9 +429,9 @@
       }
 
       async setupCamera() {
-const stream = await navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
-});
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }
+        });
         elements.video.srcObject = stream;
         elements.video.play();
       }
@@ -456,7 +448,6 @@ const stream = await navigator.mediaDevices.getUserMedia({
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // Створюємо два об’єкти для двох рук
         for (let i = 0; i < 2; i++) {
           const shaderMaterial = new THREE.ShaderMaterial({
             uniforms: {
@@ -473,11 +464,10 @@ const stream = await navigator.mediaDevices.getUserMedia({
             depthWrite: false
           });
 
-          const aspect = 0.714;
-          const geometry = new THREE.PlaneGeometry(aspect, 1);
+          // ✅ Квадратна геометрія для 500×500 PNG
+          const geometry = new THREE.PlaneGeometry(1, 1);
           const glove = new THREE.Mesh(geometry, shaderMaterial);
           glove.visible = false;
-          glove.userData.index = i;
           scene.add(glove);
           palmGloves.push(glove);
         }
@@ -562,13 +552,10 @@ const stream = await navigator.mediaDevices.getUserMedia({
             elements.handIndicator.classList.remove('show');
             state.lastLandmarks = predictions.landmarks;
 
-            // Обробляємо кожну руку
             for (let i = 0; i < predictions.landmarks.length; i++) {
               const landmarks = predictions.landmarks[i];
               const wrist = landmarks[0];
               const middleMCP = landmarks[9];
-
-              // Швидкість зап’ястя
               const wristScreen = { x: wrist.x * window.innerWidth, y: wrist.y * window.innerHeight };
               if (state.lastWristPos && state.lastWristPos[i]) {
                 state.wristVelocity.x = wristScreen.x - state.lastWristPos[i].x;
@@ -577,7 +564,6 @@ const stream = await navigator.mediaDevices.getUserMedia({
               if (!state.lastWristPos) state.lastWristPos = [];
               state.lastWristPos[i] = wristScreen;
 
-              // Зберігаємо дані для цієї руки
               state.hands[i] = {
                 landmarks,
                 wrist,
@@ -602,15 +588,9 @@ const stream = await navigator.mediaDevices.getUserMedia({
       }
 
       updateSparkles() {
-        // Нові частинки
         if (Math.random() < 0.08) {
-          sparkles.push(new SparkleParticle(
-            Math.random() * window.innerWidth,
-            -10
-          ));
+          sparkles.push(new SparkleParticle(Math.random() * window.innerWidth, -10));
         }
-
-        // Оновлюємо
         sparkles.forEach(p => p.update(
           palmGloves[0]?.visible ? {
             x: palmGloves[0].position.x + window.innerWidth / 2,
@@ -618,11 +598,7 @@ const stream = await navigator.mediaDevices.getUserMedia({
           } : null,
           state.wristVelocity
         ));
-
-        // Прибираємо мертвих
         while (sparkles.length > 300) sparkles.shift();
-
-        // Малюємо
         confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         sparkles.forEach(p => p.draw(confettiCtx));
       }
@@ -630,11 +606,9 @@ const stream = await navigator.mediaDevices.getUserMedia({
       renderScene() {
         if (!state.lastLandmarks || !palmGloves) return;
 
-        // Обробляємо кожну руку
         for (let i = 0; i < state.hands.length; i++) {
           const hand = state.hands[i];
           if (!hand) continue;
-
           const glove = palmGloves[i];
           if (!glove) continue;
 
@@ -642,11 +616,10 @@ const stream = await navigator.mediaDevices.getUserMedia({
           const centerY = hand.screenY;
           let scale = hand.distance * 0.9;
           scale = Math.max(80, Math.min(300, scale));
-
           const angle = Math.atan2(hand.middleMCP.y - hand.wrist.y, hand.middleMCP.x - hand.wrist.x);
 
           glove.position.set(centerX - window.innerWidth / 2, centerY - window.innerHeight / 2, 0);
-          glove.scale.set(scale * 0.714, scale, 1);
+          glove.scale.set(scale, scale, 1); // ✅ квадратний масштаб
           glove.rotation.z = angle;
 
           if (gloveTextures[state.currentDesign]) {
@@ -654,17 +627,12 @@ const stream = await navigator.mediaDevices.getUserMedia({
             glove.material.needsUpdate = true;
           }
 
-          // Ефект "розчинення"
           if (state.fadeOut) {
             glove.material.uniforms.fadeOpacity.value = Math.max(0, glove.material.uniforms.fadeOpacity.value - 0.05);
-            if (glove.material.uniforms.fadeOpacity.value <= 0) {
-              glove.visible = false;
-            }
+            if (glove.material.uniforms.fadeOpacity.value <= 0) glove.visible = false;
           } else if (state.fadeIn) {
             glove.material.uniforms.fadeOpacity.value = Math.min(1, glove.material.uniforms.fadeOpacity.value + 0.05);
-            if (glove.material.uniforms.fadeOpacity.value >= 1) {
-              state.fadeIn = false;
-            }
+            if (glove.material.uniforms.fadeOpacity.value >= 1) state.fadeIn = false;
             glove.visible = true;
           } else {
             glove.material.uniforms.fadeOpacity.value = 1;
@@ -721,4 +689,3 @@ const stream = await navigator.mediaDevices.getUserMedia({
   </script>
 </body>
 </html>
-
