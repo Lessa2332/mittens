@@ -776,40 +776,58 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
 
   const { landmarks, wrist } = handData;
   
-// ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
-const middleFingerTip = landmarks[12];
-const centerX = middleFingerTip.x * window.innerWidth;
-const centerY = (1 - middleFingerTip.y) * window.innerHeight;
+  // ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
+  const middleFingerTip = landmarks[12];
+  const centerX = middleFingerTip.x * window.innerWidth;
+  const centerY = (1 - middleFingerTip.y) * window.innerHeight;
 
-// Масштаб
-let scale = 500;
+  // Масштаб
+  let scale = 500;
 
-// Rotation - від зап'ястя до кінчика середнього пальця
-const wrist = landmarks[0];
-const angle = Math.atan2(
-  middleFingerTip.y - wrist.y,
-  middleFingerTip.x - wrist.x
-);
+  // Rotation - від зап'ястя до кінчика середнього пальця
+  const angle = Math.atan2(
+    middleFingerTip.y - wrist.y,
+    middleFingerTip.x - wrist.x
+  );
 
-const glovePosition = {
-  x: centerX - window.innerWidth / 2,
-  y: centerY - window.innerHeight / 2
-};
+  const glovePosition = {
+    x: centerX - window.innerWidth / 2,
+    y: centerY - window.innerHeight / 2
+  };
 
-glove.position.set(glovePosition.x, glovePosition.y, 0);
+  glove.position.set(glovePosition.x, glovePosition.y, 0);
 
-// КОРЕКЦІЯ ПОЗИЦІЇ - рукавиця на кінчику пальця
-// Відстань від кінчика пальця до основи рукавички (верхня частина)
-const offsetDistance = scale * 0.4; // Експериментуйте з цим значенням
-glove.position.x -= Math.cos(angle) * offsetDistance;
-glove.position.y += Math.sin(angle) * offsetDistance;
+  // КОРЕКЦІЯ ПОЗИЦІЇ - рукавиця на кінчику пальця
+  const offsetDistance = scale * 0.4;
+  glove.position.x -= Math.cos(angle) * offsetDistance;
+  glove.position.y += Math.sin(angle) * offsetDistance;
   
-// ВАРІАНТ 4 - ПРОСТЕ ВИПРАВЛЕННЯ
-if (handIndex === 1) {
-  glove.scale.set(-scale, -scale, 1); // Обидві осі дзеркалимо для правої руки
-} else {
-  glove.scale.set(scale, -scale, 1); // Тільки по Y дзеркалимо для лівої руки
-}
+  // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
+  const thumbBase = landmarks[1];
+  const pinkyBase = landmarks[17];
+  const palmDirection = thumbBase.x - pinkyBase.x;
+
+  // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ
+  if (handIndex === 1) {
+    // Права рука
+    if (palmDirection > 0) {
+      // Долоня до камери - не дзеркалимо
+      glove.scale.set(scale, -scale, 1);
+    } else {
+      // Зовнішня сторона до камери - дзеркалимо
+      glove.scale.set(-scale, -scale, 1);
+    }
+  } else {
+    // Ліва рука
+    if (palmDirection < 0) {
+      // Долоня до камери - не дзеркалимо
+      glove.scale.set(scale, -scale, 1);
+    } else {
+      // Зовнішня сторона до камери - дзеркалимо
+      glove.scale.set(-scale, -scale, 1);
+    }
+  }
+  
   // Vertical rotation
   glove.rotation.z = angle - Math.PI / 2;
 
@@ -1282,6 +1300,7 @@ if (handIndex === 1) {
   </script>
 </body>
 </html>
+
 
 
 
