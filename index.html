@@ -775,19 +775,7 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   }
 
   const { landmarks, wrist } = handData;
-  // АВТОМАТИЧНЕ ВИЗНАЧЕННЯ ЛІВОЇ/ПРАВОЇ РУКИ
-const thumbBase = landmarks[1];
-const pinkyBase = landmarks[17];
-const handDirection = thumbBase.x - pinkyBase.x;
-
-// Якщо великий палець правіше за мізинець - це права рука
-if (handDirection > 0) {
-  // ПРАВА рука - не дзеркалимо
-  glove.scale.set(scale, -scale, 1);
-} else {
-  // ЛІВА рука - дзеркалимо
-  glove.scale.set(-scale, -scale, 1);
-}
+  
   // ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
   const middleFingerTip = landmarks[12];
   const centerX = middleFingerTip.x * window.innerWidth;
@@ -814,14 +802,30 @@ if (handDirection > 0) {
   glove.position.x -= Math.cos(angle) * offsetDistance;
   glove.position.y += Math.sin(angle) * offsetDistance;
   
-  // АДАПТАЦІЯ ДЛЯ ОБОХ РУК
-  // Ваш PNG має великий палець справа - це ПРАВА рукавичка
-  if (handIndex === 0) {
-    // ЛІВА рука - дзеркалимо по горизонталі
-    glove.scale.set(-scale, -scale, 1);
+  // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
+  const thumbBase = landmarks[1];
+  const pinkyBase = landmarks[17];
+  const palmDirection = thumbBase.x - pinkyBase.x;
+
+  // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ
+  if (handIndex === 1) {
+    // Права рука
+    if (palmDirection > 0) {
+      // Долоня до камери - не дзеркалимо
+      glove.scale.set(scale, -scale, 1);
+    } else {
+      // Зовнішня сторона до камери - дзеркалимо
+      glove.scale.set(-scale, -scale, 1);
+    }
   } else {
-    // ПРАВА рука - не дзеркалимо (великий палець вже справа)
-    glove.scale.set(scale, -scale, 1);
+    // Ліва рука
+    if (palmDirection < 0) {
+      // Долоня до камери - не дзеркалимо
+      glove.scale.set(scale, -scale, 1);
+    } else {
+      // Зовнішня сторона до камери - дзеркалимо
+      glove.scale.set(-scale, -scale, 1);
+    }
   }
   
   // Vertical rotation
@@ -1295,6 +1299,7 @@ if (handDirection > 0) {
   </script>
 </body>
 </html>
+
 
 
 
