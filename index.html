@@ -59,6 +59,7 @@
 
     #langBtn { top: 20px; right: 20px; font-weight: bold; font-size: 16px; }
     #soundBtn { top: 20px; left: 20px; }
+    #debugBtn { top: 90px; left: 20px; background: #ff4444; }
 
     #authorBtn {
       position: fixed;
@@ -188,6 +189,44 @@
       animation: slideDown 0.3s ease; 
     }
 
+    #debugInfo {
+      position: fixed;
+      top: 160px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      color: #00ff00;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #00ff00;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 300px;
+      z-index: 98;
+      display: none;
+    }
+
+    .debug-point {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff0000;
+      border: 2px solid white;
+      z-index: 97;
+      pointer-events: none;
+    }
+
+    .debug-line {
+      position: absolute;
+      height: 2px;
+      background: #00ff00;
+      z-index: 96;
+      pointer-events: none;
+      transform-origin: left center;
+    }
+
     @keyframes spin { 
       0% { transform: rotate(0deg); } 
       100% { transform: rotate(360deg); } 
@@ -222,6 +261,11 @@
         width: 50px; 
         height: 75px; 
       }
+
+      #debugInfo {
+        font-size: 10px;
+        max-width: 200px;
+      }
     }
   </style>
 </head>
@@ -238,6 +282,7 @@
 
   <button id="langBtn" class="control-btn" aria-label="Switch language">UK</button>
   <button id="soundBtn" class="control-btn" aria-label="Toggle sound">🔊</button>
+  <button id="debugBtn" class="control-btn" aria-label="Debug mode">🐛</button>
 
   <a href="https://smartlessa.etsy.com" target="_blank" id="authorBtn" aria-label="Author: smartlessa.etsy.com">
     🎄
@@ -249,6 +294,8 @@
     <span>👐</span>
     <span>Show your hand(s)</span>
   </div>
+
+  <div id="debugInfo"></div>
 
   <script type="importmap">
     {
@@ -282,7 +329,12 @@
         VOLUME: 0.4,
         CLICK_VOLUME: 0.5
       },
-      DESIGNS: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+      DESIGNS: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+      DEBUG: {
+        ENABLED: false,
+        SHOW_LANDMARKS: false,
+        SHOW_BOUNDING_BOX: false
+      }
     };
 
     // ========== TRANSLATIONS ==========
@@ -360,6 +412,129 @@
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+      }
+    }
+
+    // ========== DEBUG MANAGER ==========
+    class DebugManager {
+      constructor() {
+        this.enabled = CONFIG.DEBUG.ENABLED;
+        this.elements = {
+          debugInfo: document.getElementById('debugInfo')
+        };
+        this.debugPoints = [];
+        this.debugLines = [];
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        this.elements.debugInfo.style.display = this.enabled ? 'block' : 'none';
+        this.clearDebugElements();
+        return this.enabled;
+      }
+
+      clearDebugElements() {
+        this.debugPoints.forEach(point => point.remove());
+        this.debugLines.forEach(line => line.remove());
+        this.debugPoints = [];
+        this.debugLines = [];
+      }
+
+      addPoint(x, y, color = '#ff0000') {
+        if (!this.enabled) return;
+        
+        const point = document.createElement('div');
+        point.className = 'debug-point';
+        point.style.left = `${x}px`;
+        point.style.top = `${y}px`;
+        point.style.background = color;
+        document.body.appendChild(point);
+        this.debugPoints.push(point);
+        
+        setTimeout(() => point.remove(), 1000);
+      }
+
+      addLine(x1, y1, x2, y2, color = '#00ff00') {
+        if (!this.enabled) return;
+        
+        const length = Math.hypot(x2 - x1, y2 - y1);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        
+        const line = document.createElement('div');
+        line.className = 'debug-line';
+        line.style.left = `${x1}px`;
+        line.style.top = `${y1}px`;
+        line.style.width = `${length}px`;
+        line.style.background = color;
+        line.style.transform = `rotate(${angle}rad)`;
+        document.body.appendChild(line);
+        this.debugLines.push(line);
+        
+        setTimeout(() => line.remove(), 1000);
+      }
+
+      updateInfo(info) {
+        if (!this.enabled) return;
+        this.elements.debugInfo.innerHTML = info;
+      }
+
+      drawLandmarks(landmarks, handIndex) {
+        if (!this.enabled || !CONFIG.DEBUG.SHOW_LANDMARKS) return;
+        
+        // Малюємо ключові точки руки
+        const keyPoints = [0, 5, 9, 13, 17]; // Зап'ястя, основи пальців
+        keyPoints.forEach(pointIndex => {
+          const landmark = landmarks[pointIndex];
+          const x = landmark.x * window.innerWidth;
+          const y = landmark.y * window.innerHeight;
+          this.addPoint(x, y, handIndex === 0 ? '#ff0000' : '#0000ff');
+        });
+
+        // Малюємо кінчик середнього пальця
+        const middleFinger = landmarks[12];
+        const mfX = middleFinger.x * window.innerWidth;
+        const mfY = middleFinger.y * window.innerHeight;
+        this.addPoint(mfX, mfY, '#ffff00');
+      }
+
+      drawBoundingBox(handData, glovePosition, scale, angle) {
+        if (!this.enabled || !CONFIG.DEBUG.SHOW_BOUNDING_BOX) return;
+        
+        const centerX = glovePosition.x + window.innerWidth / 2;
+        const centerY = glovePosition.y + window.innerHeight / 2;
+        
+        // Малюємо центр рукавички
+        this.addPoint(centerX, centerY, '#00ffff');
+        
+        // Малюємо bounding box
+        const halfWidth = scale / 2;
+        const halfHeight = scale / 2;
+        
+        const corners = [
+          { x: -halfWidth, y: -halfHeight },
+          { x: halfWidth, y: -halfHeight },
+          { x: halfWidth, y: halfHeight },
+          { x: -halfWidth, y: halfHeight }
+        ];
+        
+        const rotatedCorners = corners.map(corner => {
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          return {
+            x: centerX + (corner.x * cos - corner.y * sin),
+            y: centerY + (corner.x * sin + corner.y * cos)
+          };
+        });
+        
+        // З'єднуємо кути
+        for (let i = 0; i < rotatedCorners.length; i++) {
+          const next = (i + 1) % rotatedCorners.length;
+          this.addLine(
+            rotatedCorners[i].x, rotatedCorners[i].y,
+            rotatedCorners[next].x, rotatedCorners[next].y,
+            '#ff00ff'
+          );
+        }
       }
     }
 
@@ -585,11 +760,11 @@
         this.gloveTextures.set(name, new THREE.CanvasTexture(canvas));
       }
 
-      updateGlove(handIndex, handData, designName, fadeState) {
+      updateGlove(handIndex, handData, designName, fadeState, debugManager) {
         const glove = this.palmGloves[handIndex];
         if (!glove || !handData) {
           if (glove) glove.visible = false;
-          return;
+          return null;
         }
 
         const { landmarks, wrist } = handData;
@@ -614,11 +789,12 @@
           middleFinger.x - wrist.x
         );
 
-        glove.position.set(
-          centerX - window.innerWidth / 2, 
-          centerY - window.innerHeight / 2, 
-          0
-        );
+        const glovePosition = {
+          x: centerX - window.innerWidth / 2,
+          y: centerY - window.innerHeight / 2
+        };
+
+        glove.position.set(glovePosition.x, glovePosition.y, 0);
         
         // Offset for better positioning
         glove.position.x += Math.cos(angle) * scale * 0.1;
@@ -643,6 +819,22 @@
 
         // Fade animation
         this.handleFadeAnimation(glove, fadeState);
+
+        // Debug information
+        if (debugManager && debugManager.enabled) {
+          debugManager.drawLandmarks(landmarks, handIndex);
+          debugManager.drawBoundingBox(handData, glove.position, scale, glove.rotation.z);
+        }
+
+        return {
+          position: { x: glove.position.x, y: glove.position.y },
+          scale: scale,
+          angle: angle,
+          screenPosition: {
+            x: centerX,
+            y: centerY
+          }
+        };
       }
 
       handleFadeAnimation(glove, fadeState) {
@@ -730,6 +922,7 @@
         this.audioService = new AudioService();
         this.handDetection = new HandDetectionService();
         this.gloveRenderer = new GloveRenderer();
+        this.debugManager = new DebugManager();
         this.sparkles = [];
         
         this.elements = {
@@ -740,6 +933,7 @@
           loadingText: document.getElementById("loadingText"),
           langBtn: document.getElementById("langBtn"),
           soundBtn: document.getElementById("soundBtn"),
+          debugBtn: document.getElementById("debugBtn"),
           designPicker: document.getElementById("designPicker"),
           handIndicator: document.getElementById("handIndicator")
         };
@@ -769,6 +963,7 @@
       bindEvents() {
         this.elements.langBtn.addEventListener('click', () => this.toggleLanguage());
         this.elements.soundBtn.addEventListener('click', () => this.toggleSound());
+        this.elements.debugBtn.addEventListener('click', () => this.toggleDebug());
         
         window.addEventListener('resize', () => {
           this.resizeCanvases();
@@ -778,6 +973,12 @@
         });
 
         window.addEventListener('beforeunload', () => this.cleanup());
+      }
+
+      toggleDebug() {
+        const isEnabled = this.debugManager.toggle();
+        this.elements.debugBtn.style.background = isEnabled ? '#00ff00' : '#ff4444';
+        this.elements.debugBtn.textContent = isEnabled ? '✅' : '🐛';
       }
 
       async setupCamera() {
@@ -981,18 +1182,33 @@
       renderFrame() {
         if (!this.state.lastLandmarks) return;
 
+        let debugInfo = `Hands: ${this.state.hands.length}<br>`;
+        debugInfo += `Design: ${this.state.currentDesign}<br>`;
+        debugInfo += `Scale Multiplier: ${CONFIG.SCALE.MULTIPLIER}<br><br>`;
+
         // Update gloves for each hand
         for (let i = 0; i < Math.max(this.state.hands.length, CONFIG.HANDS.MAX_HANDS); i++) {
-          this.gloveRenderer.updateGlove(
+          const gloveData = this.gloveRenderer.updateGlove(
             i, 
             this.state.hands[i], 
             this.state.currentDesign, 
             {
               fadeOut: this.state.fadeOut,
               fadeIn: this.state.fadeIn
-            }
+            },
+            this.debugManager
           );
+
+          if (gloveData && this.debugManager.enabled) {
+            debugInfo += `Hand ${i}:<br>`;
+            debugInfo += `- Pos: (${gloveData.screenPosition.x.toFixed(1)}, ${gloveData.screenPosition.y.toFixed(1)})<br>`;
+            debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
+            debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br><br>`;
+          }
         }
+
+        // Update debug info
+        this.debugManager.updateInfo(debugInfo);
 
         // Update shader uniforms
         this.gloveRenderer.updateUniforms(
@@ -1061,6 +1277,7 @@
         
         this.handDetection.cleanup();
         this.gloveRenderer.cleanup();
+        this.debugManager.clearDebugElements();
       }
     }
 
