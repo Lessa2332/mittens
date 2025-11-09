@@ -445,14 +445,12 @@
           
           elements.video.srcObject = stream;
           
-          // ✅ ВИПРАВЛЕННЯ: Чекаємо поки відео буде готове
           await new Promise((resolve, reject) => {
             elements.video.onloadedmetadata = () => {
               elements.video.play().then(resolve).catch(reject);
             };
             elements.video.onerror = reject;
             
-            // Fallback на випадок якщо onloadedmetadata не спрацює
             setTimeout(() => {
               if (elements.video.readyState >= 1) {
                 elements.video.play().then(resolve).catch(reject);
@@ -621,8 +619,8 @@
                 landmarks,
                 wrist,
                 middleMCP,
-                screenX: (wrist.x + middleMCP.x) / 2 * window.innerWidth,
-                screenY: (1 - (wrist.y + middleMCP.y) / 2) * window.innerHeight,
+                screenX: wrist.x * window.innerWidth,
+                screenY: (1 - wrist.y) * window.innerHeight,
                 distance: Math.hypot(
                   (middleMCP.x - wrist.x) * window.innerWidth,
                   (middleMCP.y - wrist.y) * window.innerHeight
@@ -674,13 +672,24 @@
           const glove = palmGloves[i];
           if (!glove) continue;
 
-          const centerX = hand.screenX;
-          const centerY = hand.screenY;
-          let scale = hand.distance * 0.9;
-          scale = Math.max(80, Math.min(300, scale));
+          // ВИПРАВЛЕНЕ центрування
+          const centerX = hand.wrist.x * window.innerWidth;
+          const centerY = (1 - hand.wrist.y) * window.innerHeight;
+          
+          // ВИПРАВЛЕНИЙ розмір
+          const handWidth = Math.hypot(
+            (hand.landmarks[5].x - hand.landmarks[17].x) * window.innerWidth,
+            (hand.landmarks[5].y - hand.landmarks[17].y) * window.innerHeight
+          );
+          let scale = handWidth * 1.8;
+          scale = Math.max(100, Math.min(400, scale));
+
+          // ВИПРАВЛЕНИЙ кут
+          const middleFinger = hand.landmarks[12];
+          const wrist = hand.landmarks[0];
           const angle = Math.atan2(
-            hand.middleMCP.y - hand.wrist.y, 
-            hand.middleMCP.x - hand.wrist.x
+            middleFinger.y - wrist.y,
+            middleFinger.x - wrist.x
           );
 
           glove.position.set(
@@ -688,6 +697,11 @@
             centerY - window.innerHeight / 2, 
             0
           );
+          
+          // Додаткове зміщення для кращого центрування
+          glove.position.x += Math.cos(angle) * scale * 0.1;
+          glove.position.y -= Math.sin(angle) * scale * 0.1;
+          
           glove.scale.set(scale, scale, 1);
           glove.rotation.z = angle;
 
