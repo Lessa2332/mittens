@@ -776,30 +776,33 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
 
   const { landmarks, wrist } = handData;
   
-  // Position
-  const centerX = wrist.x * window.innerWidth;
-  const centerY = (1 - wrist.y) * window.innerHeight;
-  
-  // ВИПРАВЛЕНИЙ МАСШТАБ - ще більший розмір
-  let scale = 500; // ЗБІЛЬШЕНО з 400 на 500
-  
-  // Rotation
-  const middleFinger = landmarks[12];
-  const angle = Math.atan2(
-    middleFinger.y - wrist.y,
-    middleFinger.x - wrist.x
-  );
+// ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
+const middleFingerTip = landmarks[12];
+const centerX = middleFingerTip.x * window.innerWidth;
+const centerY = (1 - middleFingerTip.y) * window.innerHeight;
 
-  const glovePosition = {
-    x: centerX - window.innerWidth / 2,
-    y: centerY - window.innerHeight / 2
-  };
+// Масштаб
+let scale = 500;
 
-  glove.position.set(glovePosition.x, glovePosition.y, 0);
+// Rotation - від зап'ястя до кінчика середнього пальця
+const wrist = landmarks[0];
+const angle = Math.atan2(
+  middleFingerTip.y - wrist.y,
+  middleFingerTip.x - wrist.x
+);
 
-  // ВИПРАВЛЕНЕ ПОЗИЦІОНУВАННЯ - краще центрування
-  glove.position.x += Math.cos(angle) * scale * 0.2;
-  glove.position.y -= Math.sin(angle) * scale * 0.2;
+const glovePosition = {
+  x: centerX - window.innerWidth / 2,
+  y: centerY - window.innerHeight / 2
+};
+
+glove.position.set(glovePosition.x, glovePosition.y, 0);
+
+// КОРЕКЦІЯ ПОЗИЦІЇ - рукавиця на кінчику пальця
+// Відстань від кінчика пальця до основи рукавички (верхня частина)
+const offsetDistance = scale * 0.4; // Експериментуйте з цим значенням
+glove.position.x -= Math.cos(angle) * offsetDistance;
+glove.position.y += Math.sin(angle) * offsetDistance;
   
 // ВАРІАНТ 4 - ПРОСТЕ ВИПРАВЛЕННЯ
 if (handIndex === 1) {
@@ -1279,6 +1282,7 @@ if (handIndex === 1) {
   </script>
 </body>
 </html>
+
 
 
 
