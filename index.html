@@ -539,30 +539,43 @@
     }
 
     // ========== SERVICES ==========
-    class AudioService {
-      constructor() {
-        this.bgMusic = new Audio('https://assets.mixkit.co/music/preview/mixkit-christmas-magic-325.mp3');
-        this.click = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3');
-        
-        this.bgMusic.loop = true;
-        this.bgMusic.volume = CONFIG.AUDIO.VOLUME;
-        this.click.volume = CONFIG.AUDIO.CLICK_VOLUME;
-      }
+class AudioService {
+  constructor() {
+    // Використовуйте ваші файли з папки audio
+    this.bgMusic = new Audio('audio/christmas-bg.mp3');
+    this.click = new Audio('audio/click.mp3');
+    
+    this.bgMusic.loop = true;
+    this.bgMusic.volume = CONFIG.AUDIO.VOLUME;
+    this.click.volume = CONFIG.AUDIO.CLICK_VOLUME;
+    
+    // Додаємо обробку помилок завантаження аудіо
+    this.bgMusic.addEventListener('error', (e) => {
+      console.error('Failed to load background music:', e);
+    });
+    
+    this.click.addEventListener('error', (e) => {
+      console.error('Failed to load click sound:', e);
+    });
+  }
 
-      playBackgroundMusic() {
-        this.bgMusic.play().catch(() => console.debug('Audio play blocked'));
-      }
+  playBackgroundMusic() {
+    this.bgMusic.play().catch((error) => {
+      console.debug('Background music play blocked or failed:', error);
+    });
+  }
 
-      pauseBackgroundMusic() {
-        this.bgMusic.pause();
-      }
+  pauseBackgroundMusic() {
+    this.bgMusic.pause();
+  }
 
-      playClick() {
-        this.click.currentTime = 0;
-        this.click.play().catch(() => console.debug('Click sound blocked'));
-      }
-    }
-
+  playClick() {
+    this.click.currentTime = 0;
+    this.click.play().catch((error) => {
+      console.debug('Click sound play blocked or failed:', error);
+    });
+  }
+}
     class HandDetectionService {
       constructor() {
         this.handLandmarker = null;
@@ -1289,3 +1302,4 @@
   </script>
 </body>
 </html>
+
