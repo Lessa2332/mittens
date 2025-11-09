@@ -802,30 +802,14 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   glove.position.x -= Math.cos(angle) * offsetDistance;
   glove.position.y += Math.sin(angle) * offsetDistance;
   
-  // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
-  const thumbBase = landmarks[1];
-  const pinkyBase = landmarks[17];
-  const palmDirection = thumbBase.x - pinkyBase.x;
-
-  // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ
-  if (handIndex === 1) {
-    // Права рука
-    if (palmDirection > 0) {
-      // Долоня до камери - не дзеркалимо
-      glove.scale.set(scale, -scale, 1);
-    } else {
-      // Зовнішня сторона до камери - дзеркалимо
-      glove.scale.set(-scale, -scale, 1);
-    }
+  // АДАПТАЦІЯ ДЛЯ ОБОХ РУК
+  // Ваш PNG має великий палець справа - це ПРАВА рукавичка
+  if (handIndex === 0) {
+    // ЛІВА рука - дзеркалимо по горизонталі
+    glove.scale.set(-scale, -scale, 1);
   } else {
-    // Ліва рука
-    if (palmDirection < 0) {
-      // Долоня до камери - не дзеркалимо
-      glove.scale.set(scale, -scale, 1);
-    } else {
-      // Зовнішня сторона до камери - дзеркалимо
-      glove.scale.set(-scale, -scale, 1);
-    }
+    // ПРАВА рука - не дзеркалимо (великий палець вже справа)
+    glove.scale.set(scale, -scale, 1);
   }
   
   // Vertical rotation
@@ -857,7 +841,6 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
     }
   };
 }
-
       handleFadeAnimation(glove, fadeState) {
         const uniforms = glove.material.uniforms;
         
@@ -1300,6 +1283,7 @@ updateGlove(handIndex, handData, designName, fadeState, debugManager) {
   </script>
 </body>
 </html>
+
 
 
 
