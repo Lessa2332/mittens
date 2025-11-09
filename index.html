@@ -631,7 +631,12 @@
             state.handNotDetectedCount++;
             if (state.handNotDetectedCount > 10) {
               elements.handIndicator.classList.add('show');
-              palmGloves.forEach(g => g.visible = false);
+              // Виправлено: приховуємо тільки рукавички для рук, яких не видно
+              for (let i = 0; i < palmGloves.length; i++) {
+                if (!state.lastLandmarks?.[i]) {
+                  palmGloves[i].visible = false;
+                }
+              }
               state.lastWristPos = null;
             }
           }
@@ -672,19 +677,19 @@
           const glove = palmGloves[i];
           if (!glove) continue;
 
-          // ВИПРАВЛЕНЕ центрування
+          // Центрування
           const centerX = hand.wrist.x * window.innerWidth;
           const centerY = (1 - hand.wrist.y) * window.innerHeight;
           
-          // ВИПРАВЛЕНИЙ розмір
+          // Розмір - ЗБІЛЬШЕНО до 2.5
           const handWidth = Math.hypot(
             (hand.landmarks[5].x - hand.landmarks[17].x) * window.innerWidth,
             (hand.landmarks[5].y - hand.landmarks[17].y) * window.innerHeight
           );
-          let scale = handWidth * 1.8;
-          scale = Math.max(100, Math.min(400, scale));
+          let scale = handWidth * 2.5; // ЗБІЛЬШЕНО з 1.8 до 2.5
+          scale = Math.max(120, Math.min(500, scale)); // Розширено діапазон
 
-          // ВИПРАВЛЕНИЙ кут
+          // Кут
           const middleFinger = hand.landmarks[12];
           const wrist = hand.landmarks[0];
           const angle = Math.atan2(
@@ -698,18 +703,27 @@
             0
           );
           
-          // Додаткове зміщення для кращого центрування
+          // Зміщення для центрування
           glove.position.x += Math.cos(angle) * scale * 0.1;
           glove.position.y -= Math.sin(angle) * scale * 0.1;
           
-          glove.scale.set(scale, scale, 1);
-          glove.rotation.z = angle;
+          // ВІДЗЕРКАЛЕННЯ для правої руки
+          if (i === 1) { // Права рука
+            glove.scale.set(-scale, scale, 1);
+          } else { // Ліва рука
+            glove.scale.set(scale, scale, 1);
+          }
+          
+          // ПОВОРОТ у вертикальну позицію
+          glove.rotation.z = angle - Math.PI / 2;
 
+          // Текстура
           if (gloveTextures[state.currentDesign]) {
             glove.material.uniforms.map.value = gloveTextures[state.currentDesign];
             glove.material.needsUpdate = true;
           }
 
+          // Анімація зникнення/появи
           if (state.fadeOut) {
             glove.material.uniforms.fadeOpacity.value = Math.max(
               0, 
