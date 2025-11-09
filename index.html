@@ -780,13 +780,13 @@
         const centerX = wrist.x * window.innerWidth;
         const centerY = (1 - wrist.y) * window.innerHeight;
         
-        // УНІВЕРСАЛЬНИЙ МАСШТАБ ДЛЯ БУДЬ-ЯКОЇ РУКИ
-        const actualHandLength = 17; // в см - для дорослого
-        const baseScale = actualHandLength * 0.14;
+// ВИПРАВЛЕНИЙ МАСШТАБ - збільшений розмір
+const actualHandLength = 17; // в см - для дорослого
+const baseScale = actualHandLength * 2.0; // ЗБІЛЬШЕНО з 0.14 на 2.0
 
-        let scale = baseScale * CONFIG.SCALE.MULTIPLIER;
-        scale = Math.max(CONFIG.SCALE.MIN, Math.min(CONFIG.SCALE.MAX, scale));
-
+let scale = 400; // Фіксований великий розмір
+scale = Math.max(300, Math.min(800, scale)); // ЗБІЛЬШЕНО мінімальний розмір
+        
         // Rotation
         const middleFinger = landmarks[12];
         const angle = Math.atan2(
@@ -799,11 +799,11 @@
           y: centerY - window.innerHeight / 2
         };
 
-        glove.position.set(glovePosition.x, glovePosition.y, 0);
-        
-        // Offset for better positioning
-        glove.position.x += Math.cos(angle) * scale * 0.1;
-        glove.position.y -= Math.sin(angle) * scale * 0.1;
+glove.position.set(glovePosition.x, glovePosition.y, 0);
+
+// ВИПРАВЛЕНЕ ПОЗИЦІОНУВАННЯ - рукавиця на долоні
+glove.position.x += Math.cos(angle) * scale * 0.3;  // ЗБІЛЬШЕНО з 0.1 на 0.3
+glove.position.y -= Math.sin(angle) * scale * 0.3;  // ЗБІЛЬШЕНО з 0.1 на 0.3
         
         // МАСШТАБУВАННЯ З ПЕРЕВЕРНУТИМИ PNG
         if (handIndex === 1) {
@@ -1284,3 +1284,4 @@
   </script>
 </body>
 </html>
+
