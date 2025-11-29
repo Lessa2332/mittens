@@ -262,9 +262,9 @@
     // ========== CONFIGURATION ==========
     const CONFIG = {
       SCALE: {
-        MULTIPLIER: 5.6,
-        MIN: 350,
-        MAX: 600
+        MULTIPLIER: 4.9,
+        MIN: 320,
+        MAX: 650
       },
       HANDS: {
         MAX_HANDS: 2,
@@ -517,22 +517,13 @@
       
       getPalmOrientation(landmarks) {
         const wrist = landmarks[0];
-        const indexMCP = landmarks[5];  // Вказівний палець основа
-        const pinkyMCP = landmarks[17]; // Мізинець основа
-        
-        // Вектори від зап'ястя до основ пальців
-        const vec1 = {
-          x: indexMCP.x - wrist.x,
-          y: indexMCP.y - wrist.y
-        };
-        const vec2 = {
-          x: pinkyMCP.x - wrist.x,
-          y: pinkyMCP.y - wrist.y
-        };
-        
-        // Векторний добуток для визначення напрямку долоні
-        const cross = vec1.x * vec2.y - vec1.y * vec2.x;
-        return cross > 0;
+        const index = landmarks[5];
+        const pinky = landmarks[17];
+
+        // Визначаємо, чи великий палець ліворуч від лінії зап'ястя–мізинець
+        const cross = (index.x - wrist.x) * (pinky.y - wrist.y) - 
+                      (index.y - wrist.y) * (pinky.x - wrist.x);
+        return cross > 0;  // > 0 = долоня до камери (великий палець ліворуч від осі руки)
       }
       
       updateGlove(handIndex, handData, designName) {
@@ -549,15 +540,15 @@
         const centerX = (wrist.x + middleFingerBase.x) / 2 * this.renderer.domElement.width;
         const centerY = (1 - (wrist.y + middleFingerBase.y) / 2) * this.renderer.domElement.height;
         
-        // Масштаб на основі розміру долоні
-        const thumbBase = landmarks[1];
-        const pinkyBase = landmarks[17];
-        const palmWidth = Math.sqrt(
-          Math.pow((thumbBase.x - pinkyBase.x) * this.renderer.domElement.width, 2) +
-          Math.pow((thumbBase.y - pinkyBase.y) * this.renderer.domElement.height, 2)
+        // Масштаб на основі розміру руки (від зап'ястя до кінчика середнього пальця)
+        const middleTip = landmarks[12];
+        const handSize = Math.hypot(
+          (middleTip.x - wrist.x) * this.renderer.domElement.width,
+          (middleTip.y - wrist.y) * this.renderer.domElement.height
         );
         
-        let scale = Math.max(palmWidth * CONFIG.SCALE.MULTIPLIER, CONFIG.SCALE.MIN);
+        let scale = handSize * CONFIG.SCALE.MULTIPLIER;
+        scale = Math.max(scale, CONFIG.SCALE.MIN);
         scale = Math.min(scale, CONFIG.SCALE.MAX);
 
         // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ - стабільніший вектор
@@ -608,7 +599,8 @@
           scale: scale,
           angle: angle,
           screenPosition: { x: centerX, y: centerY },
-          isPalmFacingCamera: isPalmFacingCamera
+          isPalmFacingCamera: isPalmFacingCamera,
+          handSize: handSize
         };
       }
       
@@ -862,6 +854,7 @@
             debugInfo += `Hand ${i}:<br>`;
             debugInfo += `- Pos: (${gloveData.screenPosition.x.toFixed(1)}, ${gloveData.screenPosition.y.toFixed(1)})<br>`;
             debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
+            debugInfo += `- Hand Size: ${gloveData.handSize.toFixed(1)}<br>`;
             debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br>`;
             debugInfo += `- Palm Facing: ${gloveData.isPalmFacingCamera}<br><br>`;
           }
