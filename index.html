@@ -263,8 +263,8 @@
     const CONFIG = {
       SCALE: {
         MULTIPLIER: 5.6,
-        MIN: 300,
-        MAX: 800
+        MIN: 250,
+        MAX: 600
       },
       HANDS: {
         MAX_HANDS: 2,
@@ -510,65 +510,89 @@
        
         this.gloveTextures.set(name, new THREE.CanvasTexture(canvas));
       }
+      
+      getHandOrientation(landmarks) {
+        const wrist = landmarks[0];
+        const thumbBase = landmarks[1];
+        const pinkyBase = landmarks[17];
+        
+        // Вектор від зап'ястя до основи великого пальця
+        const thumbVector = {
+          x: thumbBase.x - wrist.x,
+          y: thumbBase.y - wrist.y
+        };
+        
+        // Вектор від зап'ястя до основи мізинця  
+        const pinkyVector = {
+          x: pinkyBase.x - wrist.x,
+          y: pinkyBase.y - wrist.y
+        };
+        
+        // Визначення напрямку долоні
+        const crossProduct = thumbVector.x * pinkyVector.y - thumbVector.y * pinkyVector.x;
+        return crossProduct > 0 ? 'right' : 'left';
+      }
+      
       updateGlove(handIndex, handData, designName) {
         const glove = this.palmGloves[handIndex];
         if (!glove || !handData) {
           if (glove) glove.visible = false;
           return null;
         }
+        
         const { landmarks, wrist } = handData;
- 
-        // ПОЗИЦІЯ КІНЧИКА СЕРЕДНЬОГО ПАЛЬЦЯ
+
+        // ВИЗНАЧЕННЯ ЦЕНТРА ДОЛОНІ
+        const middleFingerBase = landmarks[9];
+        const centerX = (wrist.x + middleFingerBase.x) / 2 * window.innerWidth;
+        const centerY = (1 - (wrist.y + middleFingerBase.y) / 2) * window.innerHeight;
+        
+        // Масштаб на основі розміру долоні
+        const thumbBase = landmarks[1];
+        const pinkyBase = landmarks[17];
+        const palmWidth = Math.sqrt(
+          Math.pow((thumbBase.x - pinkyBase.x) * window.innerWidth, 2) +
+          Math.pow((thumbBase.y - pinkyBase.y) * window.innerHeight, 2)
+        );
+        
+        let scale = Math.max(palmWidth * 1.8, CONFIG.SCALE.MIN);
+        scale = Math.min(scale, CONFIG.SCALE.MAX);
+
+        // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ
         const middleFingerTip = landmarks[12];
-        const centerX = middleFingerTip.x * window.innerWidth;
-        const centerY = (1 - middleFingerTip.y) * window.innerHeight;
-        
-        // Масштаб
-        let scale = 500;
-        
-        // Rotation - від зап'ястя до кінчика середнього пальця
         const angle = Math.atan2(
           middleFingerTip.y - wrist.y,
           middleFingerTip.x - wrist.x
         );
+
+        // ПОЗИЦІЮВАННЯ РУКАВИЦІ
         const glovePosition = {
           x: centerX - window.innerWidth / 2,
           y: centerY - window.innerHeight / 2
         };
         glove.position.set(glovePosition.x, glovePosition.y, 0);
-        
-        // КОРЕКЦІЯ ПОЗИЦІЇ - рукавиця на кінчику пальця
-        const offsetDistance = scale * 0.4;
-        glove.position.x -= Math.cos(angle) * offsetDistance;
-        glove.position.y += Math.sin(angle) * offsetDistance;
- 
-        // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
-        const thumbBase = landmarks[1];
-        const pinkyBase = landmarks[17];
-        const palmDirection = thumbBase.x - pinkyBase.x;
 
-        // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ
-        if (handIndex === 1) {
-          // Права рука
-          if (palmDirection > 0) {
-            // Долоня до камери - не дзеркалимо
-            glove.scale.set(scale, -scale, 1);
-          } else {
-            // Зовнішня сторона до камери - дзеркалимо
-            glove.scale.set(-scale, -scale, 1);
-          }
+        // КОРЕКЦІЯ ПОЗИЦІЇ - центрування на долоні
+        const offsetDistance = scale * 0.1;
+        glove.position.x += Math.cos(angle) * offsetDistance;
+        glove.position.y -= Math.sin(angle) * offsetDistance;
+
+        // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
+        const handOrientation = this.getHandOrientation(landmarks);
+        const palmDirection = thumbBase.x - pinkyBase.x;
+        const isPalmFacingCamera = (handOrientation === 'right' && palmDirection > 0) || 
+                                  (handOrientation === 'left' && palmDirection < 0);
+
+        // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ ТА ПОВОРОТ
+        if (isPalmFacingCamera) {
+          // Долоня до камери - нормальна орієнтація
+          glove.scale.set(scale, scale, 1);
         } else {
-          // Ліва рука
-          if (palmDirection < 0) {
-            // Долоня до камери - не дзеркалимо
-            glove.scale.set(scale, -scale, 1);
-          } else {
-            // Зовнішня сторона до камери - дзеркалимо
-            glove.scale.set(-scale, -scale, 1);
-          }
+          // Тыльна сторона до камери - дзеркалимо
+          glove.scale.set(-scale, scale, 1);
         }
- 
-        // Vertical rotation
+
+        // Vertical rotation - вирівнювання по напрямку руки
         glove.rotation.z = angle - Math.PI / 2;
         
         // Texture
@@ -583,9 +607,12 @@
           position: { x: glove.position.x, y: glove.position.y },
           scale: scale,
           angle: angle,
-          screenPosition: { x: centerX, y: centerY }
+          screenPosition: { x: centerX, y: centerY },
+          handOrientation: handOrientation,
+          isPalmFacingCamera: isPalmFacingCamera
         };
       }
+      
       resize() {
         if (!this.camera || !this.renderer) return;
        
@@ -814,7 +841,9 @@
             debugInfo += `Hand ${i}:<br>`;
             debugInfo += `- Pos: (${gloveData.screenPosition.x.toFixed(1)}, ${gloveData.screenPosition.y.toFixed(1)})<br>`;
             debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
-            debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br><br>`;
+            debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br>`;
+            debugInfo += `- Orientation: ${gloveData.handOrientation}<br>`;
+            debugInfo += `- Palm Facing: ${gloveData.isPalmFacingCamera}<br><br>`;
           }
         }
         this.debugManager.updateInfo(debugInfo);
