@@ -263,7 +263,7 @@
     const CONFIG = {
       SCALE: {
         MULTIPLIER: 5.6,
-        MIN: 250,
+        MIN: 350,
         MAX: 600
       },
       HANDS: {
@@ -273,7 +273,7 @@
       PERFORMANCE: {
         DETECTION_THROTTLE_MS: 50,
         MAX_SPARKLES: 150,
-        SPARKLE_SPAWN_RATE: 0.08
+        SPARKLE_SPAWN_RATE: 0.04
       },
       AUDIO: {
         VOLUME: 0.4,
@@ -294,7 +294,8 @@
         retry: "Retry",
         handNotDetected: "Show your hand(s)",
         errorCamera: "Camera access denied. Try Chrome or Safari.",
-        errorGeneral: "AR failed to load. Refresh page."
+        errorGeneral: "AR failed to load. Refresh page.",
+        errorMediaPipe: "AI model failed to load. Check internet connection."
       },
       uk: {
         title: "Різдвяний AR-приміряльник рукавичок",
@@ -303,7 +304,8 @@
         retry: "Повторити",
         handNotDetected: "Покажіть руку(руки)",
         errorCamera: "Доступ до камери заборонено. Спробуйте Chrome або Safari.",
-        errorGeneral: "AR не вдалося завантажити. Оновіть сторінку."
+        errorGeneral: "AR не вдалося завантажити. Оновіть сторінку.",
+        errorMediaPipe: "AI модель не завантажилась. Перевірте інтернет."
       }
     };
 
@@ -397,7 +399,7 @@
           return true;
         } catch (error) {
           console.error('Hand detection initialization failed:', error);
-          throw new Error('HAND_DETECTION_INIT_FAILED');
+          throw new Error('MEDIAPIPE_ERROR');
         }
       }
       detectHands(videoElement) {
@@ -472,27 +474,29 @@
         }
       }
       async loadTextures() {
+        const loader = new THREE.TextureLoader();
+        loader.setCrossOrigin('anonymous');
+
         const loadPromises = CONFIG.DESIGNS.map(name =>
           new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.src = `gloves/winter/${name}.png`;
-           
-            img.onload = () => {
-              const texture = new THREE.TextureLoader().load(`gloves/winter/${name}.png`);
-              texture.minFilter = THREE.LinearFilter;
-              texture.magFilter = THREE.LinearFilter;
-              this.gloveTextures.set(name, texture);
-              resolve();
-            };
-           
-            img.onerror = () => {
-              console.warn(`Failed to load design ${name}, using fallback`);
-              this.createFallbackTexture(name);
-              resolve();
-            };
+            loader.load(
+              `gloves/winter/${name}.png`,
+              (texture) => {
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                this.gloveTextures.set(name, texture);
+                resolve();
+              },
+              undefined,
+              (err) => {
+                console.warn(`Failed to load design ${name}:`, err);
+                this.createFallbackTexture(name);
+                resolve();
+              }
+            );
           })
         );
+
         await Promise.all(loadPromises);
       }
       createFallbackTexture(name) {
@@ -511,26 +515,24 @@
         this.gloveTextures.set(name, new THREE.CanvasTexture(canvas));
       }
       
-      getHandOrientation(landmarks) {
+      getPalmOrientation(landmarks) {
         const wrist = landmarks[0];
-        const thumbBase = landmarks[1];
-        const pinkyBase = landmarks[17];
+        const indexMCP = landmarks[5];  // Вказівний палець основа
+        const pinkyMCP = landmarks[17]; // Мізинець основа
         
-        // Вектор від зап'ястя до основи великого пальця
-        const thumbVector = {
-          x: thumbBase.x - wrist.x,
-          y: thumbBase.y - wrist.y
+        // Вектори від зап'ястя до основ пальців
+        const vec1 = {
+          x: indexMCP.x - wrist.x,
+          y: indexMCP.y - wrist.y
+        };
+        const vec2 = {
+          x: pinkyMCP.x - wrist.x,
+          y: pinkyMCP.y - wrist.y
         };
         
-        // Вектор від зап'ястя до основи мізинця  
-        const pinkyVector = {
-          x: pinkyBase.x - wrist.x,
-          y: pinkyBase.y - wrist.y
-        };
-        
-        // Визначення напрямку долоні
-        const crossProduct = thumbVector.x * pinkyVector.y - thumbVector.y * pinkyVector.x;
-        return crossProduct > 0 ? 'right' : 'left';
+        // Векторний добуток для визначення напрямку долоні
+        const cross = vec1.x * vec2.y - vec1.y * vec2.x;
+        return cross > 0;
       }
       
       updateGlove(handIndex, handData, designName) {
@@ -544,44 +546,42 @@
 
         // ВИЗНАЧЕННЯ ЦЕНТРА ДОЛОНІ
         const middleFingerBase = landmarks[9];
-        const centerX = (wrist.x + middleFingerBase.x) / 2 * window.innerWidth;
-        const centerY = (1 - (wrist.y + middleFingerBase.y) / 2) * window.innerHeight;
+        const centerX = (wrist.x + middleFingerBase.x) / 2 * this.renderer.domElement.width;
+        const centerY = (1 - (wrist.y + middleFingerBase.y) / 2) * this.renderer.domElement.height;
         
         // Масштаб на основі розміру долоні
         const thumbBase = landmarks[1];
         const pinkyBase = landmarks[17];
         const palmWidth = Math.sqrt(
-          Math.pow((thumbBase.x - pinkyBase.x) * window.innerWidth, 2) +
-          Math.pow((thumbBase.y - pinkyBase.y) * window.innerHeight, 2)
+          Math.pow((thumbBase.x - pinkyBase.x) * this.renderer.domElement.width, 2) +
+          Math.pow((thumbBase.y - pinkyBase.y) * this.renderer.domElement.height, 2)
         );
         
-        let scale = Math.max(palmWidth * 1.8, CONFIG.SCALE.MIN);
+        let scale = Math.max(palmWidth * CONFIG.SCALE.MULTIPLIER, CONFIG.SCALE.MIN);
         scale = Math.min(scale, CONFIG.SCALE.MAX);
 
-        // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ
-        const middleFingerTip = landmarks[12];
+        // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ - стабільніший вектор
+        const indexFingerBase = landmarks[5];
+        const indexFingerTip = landmarks[8];
         const angle = Math.atan2(
-          middleFingerTip.y - wrist.y,
-          middleFingerTip.x - wrist.x
+          indexFingerTip.y - indexFingerBase.y,
+          indexFingerTip.x - indexFingerBase.x
         );
 
         // ПОЗИЦІЮВАННЯ РУКАВИЦІ
         const glovePosition = {
-          x: centerX - window.innerWidth / 2,
-          y: centerY - window.innerHeight / 2
+          x: centerX - this.renderer.domElement.width / 2,
+          y: centerY - this.renderer.domElement.height / 2
         };
         glove.position.set(glovePosition.x, glovePosition.y, 0);
 
         // КОРЕКЦІЯ ПОЗИЦІЇ - центрування на долоні
-        const offsetDistance = scale * 0.1;
+        const offsetDistance = scale * 0.15;
         glove.position.x += Math.cos(angle) * offsetDistance;
         glove.position.y -= Math.sin(angle) * offsetDistance;
 
         // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
-        const handOrientation = this.getHandOrientation(landmarks);
-        const palmDirection = thumbBase.x - pinkyBase.x;
-        const isPalmFacingCamera = (handOrientation === 'right' && palmDirection > 0) || 
-                                  (handOrientation === 'left' && palmDirection < 0);
+        const isPalmFacingCamera = this.getPalmOrientation(landmarks);
 
         // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ ТА ПОВОРОТ
         if (isPalmFacingCamera) {
@@ -593,7 +593,7 @@
         }
 
         // Vertical rotation - вирівнювання по напрямку руки
-        glove.rotation.z = angle - Math.PI / 2;
+        glove.rotation.z = angle;
         
         // Texture
         const texture = this.gloveTextures.get(designName);
@@ -608,7 +608,6 @@
           scale: scale,
           angle: angle,
           screenPosition: { x: centerX, y: centerY },
-          handOrientation: handOrientation,
           isPalmFacingCamera: isPalmFacingCamera
         };
       }
@@ -616,13 +615,13 @@
       resize() {
         if (!this.camera || !this.renderer) return;
        
-        this.camera.left = -window.innerWidth / 2;
-        this.camera.right = window.innerWidth / 2;
-        this.camera.top = window.innerHeight / 2;
-        this.camera.bottom = -window.innerHeight / 2;
+        this.camera.left = -this.renderer.domElement.width / 2;
+        this.camera.right = this.renderer.domElement.width / 2;
+        this.camera.top = this.renderer.domElement.height / 2;
+        this.camera.bottom = -this.renderer.domElement.height / 2;
         this.camera.updateProjectionMatrix();
        
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setSize(this.renderer.domElement.width, this.renderer.domElement.height);
       }
       render() {
         if (this.scene && this.camera) {
@@ -681,8 +680,17 @@
         try {
           await this.setupCamera();
           this.gloveRenderer.initialize(this.elements.canvas);
-          await this.handDetection.initialize();
-          await this.gloveRenderer.loadTextures();
+          
+          // Завантажуємо текстури паралельно з MediaPipe для швидкості
+          const [texturesLoaded] = await Promise.allSettled([
+            this.gloveRenderer.loadTextures(),
+            this.handDetection.initialize()
+          ]);
+          
+          if (texturesLoaded.status === 'rejected') {
+            console.warn('Some textures failed to load, using fallbacks');
+          }
+          
           this.buildDesignUI();
           this.updateUI();
           this.hideLoading();
@@ -704,6 +712,14 @@
           }
         });
         window.addEventListener('beforeunload', () => this.cleanup());
+        
+        // Розблокування аудіо при першій взаємодії
+        document.addEventListener('click', () => {
+          if (!this.state.isAudioUnlocked) {
+            this.audioService.click.play().catch(() => {});
+            this.state.isAudioUnlocked = true;
+          }
+        }, { once: true });
       }
       toggleDebug() {
         const isEnabled = this.debugManager.toggle();
@@ -753,6 +769,7 @@
           btn.src = `gloves/winter/${name}.png`;
           btn.className = `design-btn ${name === this.state.currentDesign ? 'selected' : ''}`;
           btn.alt = `Design ${name}`;
+          btn.loading = 'lazy'; // Lazy loading для кращої продуктивності
          
           btn.addEventListener('click', () => {
             this.state.currentDesign = name;
@@ -807,7 +824,10 @@
         });
       }
       updateSparkles() {
-        if (Math.random() < CONFIG.PERFORMANCE.SPARKLE_SPAWN_RATE) {
+        // Менше конфеті, коли рукавичок не видно
+        const spawnRate = this.state.hands.length > 0 ? CONFIG.PERFORMANCE.SPARKLE_SPAWN_RATE : 0.01;
+        
+        if (Math.random() < spawnRate) {
           this.sparkles.push(new SparkleParticle(
             Math.random() * window.innerWidth,
             -10
@@ -829,6 +849,7 @@
       renderFrame() {
         let debugInfo = `Hands: ${this.state.hands.length}<br>`;
         debugInfo += `Design: ${this.state.currentDesign}<br>`;
+        debugInfo += `Canvas: ${this.gloveRenderer.renderer.domElement.width}x${this.gloveRenderer.renderer.domElement.height}<br>`;
         
         for (let i = 0; i < this.state.hands.length; i++) {
           const hand = this.state.hands[i];
@@ -842,7 +863,6 @@
             debugInfo += `- Pos: (${gloveData.screenPosition.x.toFixed(1)}, ${gloveData.screenPosition.y.toFixed(1)})<br>`;
             debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
             debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br>`;
-            debugInfo += `- Orientation: ${gloveData.handOrientation}<br>`;
             debugInfo += `- Palm Facing: ${gloveData.isPalmFacingCamera}<br><br>`;
           }
         }
@@ -870,8 +890,12 @@
         console.error('Application error:', error);
         const t = TRANSLATIONS[this.state.currentLang];
        
-        let message = error.message === 'CAMERA_ERROR' ?
-          t.errorCamera : t.errorGeneral;
+        let message = t.errorGeneral;
+        if (error.message === 'CAMERA_ERROR') {
+          message = t.errorCamera;
+        } else if (error.message === 'MEDIAPIPE_ERROR') {
+          message = t.errorMediaPipe;
+        }
          
         this.elements.loading.innerHTML = `
           <div style="color: #ff4757; font-size: 24px; margin-bottom: 20px;">Error</div>
