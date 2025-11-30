@@ -262,9 +262,9 @@
     // ========== CONFIGURATION ==========
     const CONFIG = {
       SCALE: {
-        MULTIPLIER: 4.9,
-        MIN: 320,
-        MAX: 650
+        MULTIPLIER: 5.4,
+        MIN: 280,
+        MAX: 720
       },
       HANDS: {
         MAX_HANDS: 2,
@@ -523,7 +523,6 @@
         const cross = (indexMCP.x - wrist.x) * (pinkyMCP.y - wrist.y) -
                       (indexMCP.y - wrist.y) * (pinkyMCP.x - wrist.x);
         
-        // FIXED: Правильна логіка для MediaPipe (Y вниз)
         return cross <= 0;  // true = долоня до камери
       }
       
@@ -535,57 +534,41 @@
         }
         
         const { landmarks, wrist } = handData;
-
-        // ВИЗНАЧЕННЯ ЦЕНТРА ДОЛОНІ
         const middleFingerBase = landmarks[9];
+        
+        // Центр долоні
         const centerX = (wrist.x + middleFingerBase.x) / 2 * this.renderer.domElement.width;
         const centerY = (1 - (wrist.y + middleFingerBase.y) / 2) * this.renderer.domElement.height;
-        
-        // Масштаб на основі розміру руки
+
+        // --- ПРАВИЛЬНИЙ РОЗРАХУНОК КУТА ---
         const middleTip = landmarks[12];
-        const handSize = Math.hypot(
-          (middleTip.x - wrist.x) * this.renderer.domElement.width,
-          (middleTip.y - wrist.y) * this.renderer.domElement.height
-        );
-        
-        let scale = handSize * CONFIG.SCALE.MULTIPLIER;
+        const dx = (middleTip.x - wrist.x) * this.renderer.domElement.width;
+        const dy = (middleTip.y - wrist.y) * this.renderer.domElement.height;
+        let angle = Math.atan2(dy, dx) + Math.PI / 2;
+
+        // --- ПРАВИЛЬНИЙ РОЗРАХУНОК МАСШТАБУ ---
+        const handLengthPx = Math.hypot(dx, dy);
+        let scale = handLengthPx * CONFIG.SCALE.MULTIPLIER;
         scale = Math.max(scale, CONFIG.SCALE.MIN);
         scale = Math.min(scale, CONFIG.SCALE.MAX);
 
-        // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ
-        const indexFingerBase = landmarks[5];
-        const indexFingerTip = landmarks[8];
-        const angle = Math.atan2(
-          indexFingerTip.y - indexFingerBase.y,
-          indexFingerTip.x - indexFingerBase.x
-        );
+        // Позиція в системі Three.js (центр екрану = 0,0)
+        const posX = centerX - this.renderer.domElement.width / 2;
+        const posY = centerY - this.renderer.domElement.height / 2;
 
-        // ПОЗИЦІЮВАННЯ РУКАВИЦІ
-        const glovePosition = {
-          x: centerX - this.renderer.domElement.width / 2,
-          y: centerY - this.renderer.domElement.height / 2
-        };
-        glove.position.set(glovePosition.x, glovePosition.y, 0);
+        glove.position.set(posX, posY, 0);
+        glove.rotation.z = angle;
 
-        // КОРЕКЦІЯ ПОЗИЦІЇ - центрування на долоні
-        const offsetDistance = scale * 0.15;
-        glove.position.x += Math.cos(angle) * offsetDistance;
-        glove.position.y -= Math.sin(angle) * offsetDistance;
+        // Корекція положення (щоб рукавиця сиділа точно по центру долоні)
+        const offset = scale * 0.14;
+        glove.position.x += Math.cos(angle - Math.PI / 2) * offset;
+        glove.position.y += Math.sin(angle - Math.PI / 2) * offset;
 
-        // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
+        // Орієнтація долоні: дзеркалимо по X якщо тильна сторона
         const isPalmFacingCamera = this.getPalmOrientation(landmarks);
+        glove.scale.set(isPalmFacingCamera ? scale : -scale, scale, 1);
 
-        // FIXED: Правильне дзеркалення
-        glove.scale.set(
-          isPalmFacingCamera ? scale : -scale,
-          scale,
-          1
-        );
-
-        // FIXED: Правильний поворот
-        glove.rotation.z = angle + Math.PI / 2;
-        
-        // Texture
+        // Текстура
         const texture = this.gloveTextures.get(designName);
         if (texture) {
           glove.material.map = texture;
@@ -593,13 +576,13 @@
         }
         
         glove.visible = true;
-        return {
-          position: { x: glove.position.x, y: glove.position.y },
-          scale: scale,
-          angle: angle,
+
+        return { 
+          scale, 
+          angle, 
+          isPalmFacingCamera, 
           screenPosition: { x: centerX, y: centerY },
-          isPalmFacingCamera: isPalmFacingCamera,
-          handSize: handSize
+          handLengthPx: handLengthPx
         };
       }
       
@@ -848,7 +831,9 @@
           if (gloveData && this.debugManager.enabled) {
             debugInfo += `Hand ${i}:<br>`;
             debugInfo += `- Palm Facing: ${gloveData.isPalmFacingCamera}<br>`;
-            debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br><br>`;
+            debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
+            debugInfo += `- Hand Length: ${gloveData.handLengthPx.toFixed(1)}px<br>`;
+            debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br><br>`;
           }
         }
         this.debugManager.updateInfo(debugInfo);
