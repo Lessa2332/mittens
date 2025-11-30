@@ -517,13 +517,14 @@
       
       getPalmOrientation(landmarks) {
         const wrist = landmarks[0];
-        const index = landmarks[5];
-        const pinky = landmarks[17];
+        const indexMCP = landmarks[5];
+        const pinkyMCP = landmarks[17];
 
-        // Визначаємо, чи великий палець ліворуч від лінії зап'ястя–мізинець
-        const cross = (index.x - wrist.x) * (pinky.y - wrist.y) - 
-                      (index.y - wrist.y) * (pinky.x - wrist.x);
-        return cross > 0;  // > 0 = долоня до камери (великий палець ліворуч від осі руки)
+        const cross = (indexMCP.x - wrist.x) * (pinkyMCP.y - wrist.y) -
+                      (indexMCP.y - wrist.y) * (pinkyMCP.x - wrist.x);
+        
+        // FIXED: Правильна логіка для MediaPipe (Y вниз)
+        return cross <= 0;  // true = долоня до камери
       }
       
       updateGlove(handIndex, handData, designName) {
@@ -540,7 +541,7 @@
         const centerX = (wrist.x + middleFingerBase.x) / 2 * this.renderer.domElement.width;
         const centerY = (1 - (wrist.y + middleFingerBase.y) / 2) * this.renderer.domElement.height;
         
-        // Масштаб на основі розміру руки (від зап'ястя до кінчика середнього пальця)
+        // Масштаб на основі розміру руки
         const middleTip = landmarks[12];
         const handSize = Math.hypot(
           (middleTip.x - wrist.x) * this.renderer.domElement.width,
@@ -551,7 +552,7 @@
         scale = Math.max(scale, CONFIG.SCALE.MIN);
         scale = Math.min(scale, CONFIG.SCALE.MAX);
 
-        // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ - стабільніший вектор
+        // ВИЗНАЧЕННЯ НАПРЯМКУ ДОЛОНІ
         const indexFingerBase = landmarks[5];
         const indexFingerTip = landmarks[8];
         const angle = Math.atan2(
@@ -574,17 +575,15 @@
         // ВИЗНАЧЕННЯ ОРІЄНТАЦІЇ ДОЛОНІ
         const isPalmFacingCamera = this.getPalmOrientation(landmarks);
 
-        // ІНТЕЛЕКТУАЛЬНЕ ДЗЕРКАЛЕННЯ ТА ПОВОРОТ
-        if (isPalmFacingCamera) {
-          // Долоня до камери - нормальна орієнтація
-          glove.scale.set(scale, scale, 1);
-        } else {
-          // Тыльна сторона до камери - дзеркалимо
-          glove.scale.set(-scale, scale, 1);
-        }
+        // FIXED: Правильне дзеркалення
+        glove.scale.set(
+          isPalmFacingCamera ? scale : -scale,
+          scale,
+          1
+        );
 
-        // Vertical rotation - вирівнювання по напрямку руки
-        glove.rotation.z = angle;
+        // FIXED: Правильний поворот
+        glove.rotation.z = angle + Math.PI / 2;
         
         // Texture
         const texture = this.gloveTextures.get(designName);
@@ -673,7 +672,6 @@
           await this.setupCamera();
           this.gloveRenderer.initialize(this.elements.canvas);
           
-          // Завантажуємо текстури паралельно з MediaPipe для швидкості
           const [texturesLoaded] = await Promise.allSettled([
             this.gloveRenderer.loadTextures(),
             this.handDetection.initialize()
@@ -705,7 +703,6 @@
         });
         window.addEventListener('beforeunload', () => this.cleanup());
         
-        // Розблокування аудіо при першій взаємодії
         document.addEventListener('click', () => {
           if (!this.state.isAudioUnlocked) {
             this.audioService.click.play().catch(() => {});
@@ -761,7 +758,7 @@
           btn.src = `gloves/winter/${name}.png`;
           btn.className = `design-btn ${name === this.state.currentDesign ? 'selected' : ''}`;
           btn.alt = `Design ${name}`;
-          btn.loading = 'lazy'; // Lazy loading для кращої продуктивності
+          btn.loading = 'lazy';
          
           btn.addEventListener('click', () => {
             this.state.currentDesign = name;
@@ -816,7 +813,6 @@
         });
       }
       updateSparkles() {
-        // Менше конфеті, коли рукавичок не видно
         const spawnRate = this.state.hands.length > 0 ? CONFIG.PERFORMANCE.SPARKLE_SPAWN_RATE : 0.01;
         
         if (Math.random() < spawnRate) {
@@ -841,7 +837,6 @@
       renderFrame() {
         let debugInfo = `Hands: ${this.state.hands.length}<br>`;
         debugInfo += `Design: ${this.state.currentDesign}<br>`;
-        debugInfo += `Canvas: ${this.gloveRenderer.renderer.domElement.width}x${this.gloveRenderer.renderer.domElement.height}<br>`;
         
         for (let i = 0; i < this.state.hands.length; i++) {
           const hand = this.state.hands[i];
@@ -852,11 +847,8 @@
           );
           if (gloveData && this.debugManager.enabled) {
             debugInfo += `Hand ${i}:<br>`;
-            debugInfo += `- Pos: (${gloveData.screenPosition.x.toFixed(1)}, ${gloveData.screenPosition.y.toFixed(1)})<br>`;
-            debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br>`;
-            debugInfo += `- Hand Size: ${gloveData.handSize.toFixed(1)}<br>`;
-            debugInfo += `- Angle: ${(gloveData.angle * 180 / Math.PI).toFixed(1)}°<br>`;
-            debugInfo += `- Palm Facing: ${gloveData.isPalmFacingCamera}<br><br>`;
+            debugInfo += `- Palm Facing: ${gloveData.isPalmFacingCamera}<br>`;
+            debugInfo += `- Scale: ${gloveData.scale.toFixed(1)}<br><br>`;
           }
         }
         this.debugManager.updateInfo(debugInfo);
@@ -927,3 +919,4 @@
   </script>
 </body>
 </html>
+
